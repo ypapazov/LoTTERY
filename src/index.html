@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LoTTERY — Public Verifiable RNG Ceremony</title>
+  <script type="module" src="./main.ts"></script>
+</head>
+<body>
+  <div id="app">
+    <!-- Toolbar -->
+    <div class="toolbar">
+      <h1>LoTTERY</h1>
+      <button id="btn-replay-mode">Replay Mode</button>
+      <button id="btn-presentation">Presentation Mode</button>
+      <button id="btn-export-log">Export Log</button>
+      <button id="btn-self-download">Download HTML</button>
+      <button id="btn-reset" class="danger">Reset</button>
+    </div>
+
+    <!-- Main Panel -->
+    <div class="main-panel" id="live-panel">
+      <div id="step-indicator"></div>
+
+      <!-- Entropy Cards -->
+      <div class="entropy-cards">
+        <div class="entropy-card" id="local-seed-card">
+          <div class="empty">Awaiting local seed…</div>
+        </div>
+        <div class="entropy-card" id="remote-seed-card">
+          <div class="empty">Awaiting remote seed…</div>
+        </div>
+        <div class="entropy-card" id="human-input-card">
+          <div class="empty">Awaiting human input…</div>
+        </div>
+      </div>
+
+      <!-- QR containers -->
+      <div class="entropy-cards">
+        <div id="local-seed-qr"></div>
+        <div id="remote-seed-qr"></div>
+        <div id="human-input-qr"></div>
+      </div>
+
+      <!-- XOR Visualization -->
+      <div id="xor-visualization" class="hidden">
+        <div class="xor-inputs">
+          <div class="xor-input-box">
+            <span class="xor-label">Local PBKDF2</span>
+            <span id="xor-local"></span>
+          </div>
+          <div class="xor-input-box">
+            <span class="xor-label">Remote PBKDF2</span>
+            <span id="xor-remote"></span>
+          </div>
+          <div class="xor-input-box">
+            <span class="xor-label">Human PBKDF2</span>
+            <span id="xor-human"></span>
+          </div>
+        </div>
+        <div class="xor-gate">⊕ XOR</div>
+        <div class="xor-output" id="xor-result"></div>
+      </div>
+
+      <!-- Step 1: Generate local seed -->
+      <div class="ceremony-step" id="step-local">
+        <h2>Step 1 — Generate Local Seed</h2>
+        <p>Generate a cryptographically random seed using the Web Crypto API. A PBKDF2 commitment will be computed and displayed.</p>
+        <button id="btn-generate-local" class="primary">Generate Local Seed</button>
+      </div>
+
+      <!-- Step 2: Remote seed -->
+      <div class="ceremony-step hidden" id="step-remote">
+        <h2>Step 2 — Fetch Remote Seed</h2>
+        <p>Fetch a random value from random.org, or enter one manually if random.org is unreachable.</p>
+        <div style="display: flex; gap: 0.5rem;">
+          <button id="btn-fetch-remote" class="primary">Fetch from random.org</button>
+          <button id="btn-manual-remote">Enter Manually</button>
+        </div>
+        <div id="remote-error" class="error-message hidden"></div>
+        <div id="manual-remote-input" class="hidden" style="margin-top: 0.75rem;">
+          <p style="margin-bottom: 0.5rem;">Enter 64 hex characters (32 bytes):</p>
+          <div class="input-row">
+            <input type="text" id="manual-remote-hex" placeholder="e.g. a1b2c3d4..." maxlength="64">
+            <button id="btn-manual-submit" class="primary">Submit</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 3: Lock parameters -->
+      <div class="ceremony-step hidden" id="step-parameters">
+        <h2>Step 3 — Lock Parameters</h2>
+        <p>Set the minimum and maximum values for the output range. These will be visible to the audience.</p>
+        <div class="input-row">
+          <label for="param-min">Min</label>
+          <input type="number" id="param-min" value="1">
+          <label for="param-max">Max</label>
+          <input type="number" id="param-max" value="100">
+          <button id="btn-lock-params" class="primary">Lock Range</button>
+        </div>
+        <div id="locked-range" class="hidden" style="margin-top: 0.5rem; color: var(--green); font-weight: 600;"></div>
+        <div id="param-error" class="error-message hidden"></div>
+      </div>
+
+      <!-- Step 4: Human input -->
+      <div class="ceremony-step hidden" id="step-human">
+        <h2>Step 4 — Human Input</h2>
+        <p>A designated person speaks a random number aloud. Enter it here after the audience has heard it.</p>
+        <div class="input-row">
+          <input type="text" id="human-input-value" placeholder="Enter the spoken number…">
+          <button id="btn-submit-human" class="primary">Submit</button>
+        </div>
+        <div id="human-error" class="error-message hidden"></div>
+      </div>
+
+      <!-- Step 5: Reveal -->
+      <div class="ceremony-step hidden" id="step-reveal">
+        <h2>Step 5 — Reveal &amp; Verify Seeds</h2>
+        <p>The local and remote seeds are now revealed. The application verifies they match the earlier commitments.</p>
+        <button id="btn-reveal" class="primary">Reveal Seeds</button>
+      </div>
+
+      <!-- Step 6+: Draw -->
+      <div class="ceremony-step hidden" id="step-draw">
+        <h2>Step 6 — Draw Numbers</h2>
+        <p>Each draw uses the next output from the CSRNG seeded by the XOR of all three sources.</p>
+        <div id="draw-result-panel" class="hidden">
+          <div id="draw-count"></div>
+          <div id="draw-result"></div>
+        </div>
+        <div id="rejection-notice" class="hidden"></div>
+        <button id="btn-draw" class="primary" style="margin-top: 0.5rem;">Draw Number</button>
+        <div id="draw-history" style="margin-top: 1rem;"></div>
+      </div>
+    </div>
+
+    <!-- Replay Panel -->
+    <div class="main-panel hidden" id="replay-panel">
+      <h2>Replay Mode</h2>
+      <p style="color: var(--text-muted); margin-bottom: 1rem;">
+        Enter the seeds and parameters from an exported ceremony log to independently verify the results.
+      </p>
+
+      <div class="replay-section">
+        <h3>Local Seed</h3>
+        <div class="input-row"><input type="text" id="replay-local-seed" placeholder="Hex seed (64 chars)"></div>
+        <div class="input-row">
+          <label>Salt</label><input type="text" id="replay-local-salt" placeholder="Hex salt (64 chars)">
+        </div>
+        <div class="input-row">
+          <label>Iter</label><input type="number" id="replay-local-iter" value="600000">
+        </div>
+      </div>
+
+      <div class="replay-section">
+        <h3>Remote Seed</h3>
+        <div class="input-row"><input type="text" id="replay-remote-seed" placeholder="Hex seed (64 chars)"></div>
+        <div class="input-row">
+          <label>Salt</label><input type="text" id="replay-remote-salt" placeholder="Hex salt (64 chars)">
+        </div>
+        <div class="input-row">
+          <label>Iter</label><input type="number" id="replay-remote-iter" value="600000">
+        </div>
+      </div>
+
+      <div class="replay-section">
+        <h3>Human Input</h3>
+        <div class="input-row"><input type="text" id="replay-human-input" placeholder="Original spoken value"></div>
+        <div class="input-row">
+          <label>Salt</label><input type="text" id="replay-human-salt" placeholder="Hex salt (64 chars)">
+        </div>
+        <div class="input-row">
+          <label>Iter</label><input type="number" id="replay-human-iter" value="600000">
+        </div>
+      </div>
+
+      <div class="replay-section">
+        <h3>Parameters</h3>
+        <div class="input-row">
+          <label>Min</label><input type="number" id="replay-min" value="1">
+          <label>Max</label><input type="number" id="replay-max" value="100">
+          <label>Draws</label><input type="number" id="replay-draw-count" value="1">
+        </div>
+      </div>
+
+      <button id="btn-replay-run" class="primary" style="width: 100%;">Run Replay</button>
+
+      <div id="replay-error" class="error-message hidden" style="margin-top: 0.5rem;"></div>
+      <div id="replay-results" class="hidden" style="margin-top: 1rem;"></div>
+    </div>
+
+    <!-- Log Panel -->
+    <div class="log-panel">
+      <div class="log-panel-header">Ceremony Log</div>
+      <div id="log-entries"></div>
+    </div>
+  </div>
+
+  <!-- Processing Indicator Overlay -->
+  <div id="processing-indicator" class="hidden">
+    <div class="spinner-container">
+      <div class="spinner"></div>
+      <div id="processing-message"></div>
+    </div>
+  </div>
+</body>
+</html>
