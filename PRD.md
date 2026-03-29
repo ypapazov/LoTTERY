@@ -53,17 +53,20 @@ The application generates a cryptographically random seed using the Web Crypto A
 **Step 2 — Fetch remote seed**
 The application requests a random value from random.org. On receipt, the PBKDF2 commitment (output + salt + iteration count) is displayed and rendered as a QR code. The seed itself is not yet revealed.
 
-**Step 3 — Lock parameters**
-The operator publicly sets the minimum and maximum values for the output range. These are displayed on screen and visible to the audience. This step is a UX operation, not a security operation — the committed seeds are opaque and cannot be exploited with knowledge of the range.
+**Lock parameters (independent)**
+The operator publicly sets the minimum and maximum values for the output range. These are displayed on screen and visible to the audience. This can be done at any point during the ceremony — it is a UX operation, not a security operation. The range must be locked before the first draw.
 
-**Step 4 — Receive human input**
+**Step 3 — Receive human input**
 A designated person provides a random number. This must be spoken aloud or otherwise made publicly visible before being entered into the application. The value is processed with PBKDF2-HMAC-SHA-256 (with a freshly generated random salt) to produce a fixed-length, computationally hardened input. The PBKDF2 output, salt, and iteration count are displayed and logged.
 
-**Step 5 — Reveal and verify commitments**
-The JS seed and random.org seed are revealed. The application recomputes their PBKDF2 outputs and displays verification status against the earlier commitments.
+**Step 4 — Reveal seeds**
+The JS seed and random.org seed are revealed on screen, replacing the masked values. The audience can now inspect and photograph the raw seed values.
+
+**Step 5 — Verify commitments**
+The application recomputes the PBKDF2 outputs for the revealed seeds and displays verification status against the earlier commitments. On success, the three PBKDF2 outputs are XOR'd to produce the combined seed, and the CSRNG is initialized.
 
 **Step 6 — Generate output**
-The three PBKDF2 outputs (JS seed commitment, random.org seed commitment, human input commitment) are XOR'd to produce a combined seed. This seeds a CSRNG. The first output of the CSRNG is mapped to the [min, max] range using rejection sampling. The result is displayed.
+The first output of the CSRNG is mapped to the [min, max] range using rejection sampling. The result is displayed.
 
 **Step 7 — Subsequent draws (if needed)**
 Each additional number is the next sequential output of the CSRNG seeded in Step 6. No new entropy is introduced. The log makes explicit that numbers 2 through N are deterministic consequences of the original three seeds.
@@ -220,7 +223,7 @@ Each log entry contains:
 |---|---|
 | `sequence` | Monotonically increasing integer |
 | `timestamp` | ISO 8601 timestamp from browser clock |
-| `event_type` | One of: `LOCAL_SEED_COMMITTED`, `REMOTE_SEED_COMMITTED`, `PARAMETERS_LOCKED`, `HUMAN_INPUT_RECEIVED`, `SEEDS_REVEALED`, `NUMBER_GENERATED`, `VALUE_REJECTED`, `CEREMONY_RESET` |
+| `event_type` | One of: `LOCAL_SEED_COMMITTED`, `REMOTE_SEED_COMMITTED`, `PARAMETERS_LOCKED`, `HUMAN_INPUT_RECEIVED`, `SEEDS_REVEALED`, `COMMITMENTS_VERIFIED`, `NUMBER_GENERATED`, `VALUE_REJECTED`, `CEREMONY_RESET` |
 | `payload` | Event-specific data (commitment values, seed values, generated numbers, etc.) |
 | `chain_hash` | `SHA-256(previous_chain_hash_bytes + SHA-256(JSON.stringify({sequence, timestamp, event_type, payload})))` — see §6.5 for serialization details |
 

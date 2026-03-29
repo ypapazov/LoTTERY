@@ -11,13 +11,14 @@ export type CeremonyStep =
   | 'INIT'
   | 'LOCAL_COMMITTED'
   | 'REMOTE_COMMITTED'
-  | 'PARAMETERS_LOCKED'
   | 'HUMAN_INPUT_RECEIVED'
   | 'SEEDS_REVEALED'
+  | 'VERIFIED'
   | 'DRAWING';
 
 export interface CeremonyState {
   step: CeremonyStep;
+  parametersLocked: boolean;
   localSeed: Uint8Array | null;
   localCommitment: Commitment | null;
   remoteSeed: Uint8Array | null;
@@ -35,9 +36,10 @@ export interface CeremonyState {
 
 export type CeremonyEventHandler = (entry: LogEntry) => void;
 
-export class Ceremony {
-  private state: CeremonyState = {
+function initialState(): CeremonyState {
+  return {
     step: 'INIT',
+    parametersLocked: false,
     localSeed: null,
     localCommitment: null,
     remoteSeed: null,
@@ -52,7 +54,10 @@ export class Ceremony {
     localVerified: null,
     remoteVerified: null,
   };
+}
 
+export class Ceremony {
+  private state: CeremonyState = initialState();
   private log = new CeremonyLog();
   private listeners: CeremonyEventHandler[] = [];
 
@@ -129,9 +134,14 @@ export class Ceremony {
     return commitment;
   }
 
+  /**
+   * Lock the output range. Can be called at any point during the ceremony.
+   * Must be locked before drawing.
+   */
   async lockParameters(min: number, max: number): Promise<void> {
-    this.assertStep('REMOTE_COMMITTED');
-
+    if (this.state.parametersLocked) {
+      throw new Error('Parameters are already locked');
+    }
     if (!Number.isInteger(min) || !Number.isInteger(max)) {
       throw new Error('min and max must be integers');
     }
@@ -144,13 +154,13 @@ export class Ceremony {
 
     this.state.min = min;
     this.state.max = max;
-    this.state.step = 'PARAMETERS_LOCKED';
+    this.state.parametersLocked = true;
 
     await this.emit('PARAMETERS_LOCKED', { min, max });
   }
 
   async receiveHumanInput(input: string): Promise<Commitment> {
-    this.assertStep('PARAMETERS_LOCKED');
+    this.assertStep('REMOTE_COMMITTED');
 
     const inputBytes = textToBytes(input);
     const salt = generateRandomBytes(32);
@@ -171,11 +181,44 @@ export class Ceremony {
     return commitment;
   }
 
-  async revealAndVerify(): Promise<{ localVerified: boolean; remoteVerified: boolean }> {
+  /**
+   * Reveal the raw seeds. Visual step — makes seeds available for inspection
+   * before verification.
+   */
+  async revealSeeds(): Promise<{ localSeed: string; remoteSeed: string; humanInput: string }> {
     this.assertStep('HUMAN_INPUT_RECEIVED');
 
-    const { localSeed, localCommitment, remoteSeed, remoteCommitment } = this.state;
-    if (!localSeed || !localCommitment || !remoteSeed || !remoteCommitment) {
+    const { localSeed, remoteSeed, humanInput } = this.state;
+    if (!localSeed || !remoteSeed || humanInput === null) {
+      throw new Error('Missing seeds or human input');
+    }
+
+    this.state.step = 'SEEDS_REVEALED';
+
+    const data = {
+      localSeed: hexEncode(localSeed),
+      remoteSeed: hexEncode(remoteSeed),
+      humanInput,
+    };
+
+    await this.emit('SEEDS_REVEALED', {
+      local_seed: data.localSeed,
+      remote_seed: data.remoteSeed,
+      human_input: data.humanInput,
+    });
+
+    return data;
+  }
+
+  /**
+   * Verify commitments against revealed seeds, XOR the PBKDF2 outputs,
+   * and initialize the CSRNG.
+   */
+  async verifyAndCombine(): Promise<{ localVerified: boolean; remoteVerified: boolean }> {
+    this.assertStep('SEEDS_REVEALED');
+
+    const { localSeed, localCommitment, remoteSeed, remoteCommitment, humanCommitment } = this.state;
+    if (!localSeed || !localCommitment || !remoteSeed || !remoteCommitment || !humanCommitment) {
       throw new Error('Missing seeds or commitments');
     }
 
@@ -188,17 +231,14 @@ export class Ceremony {
     const combinedSeed = xorThree(
       localCommitment.pbkdf2Output,
       remoteCommitment.pbkdf2Output,
-      this.state.humanCommitment!.pbkdf2Output,
+      humanCommitment.pbkdf2Output,
     );
 
     this.state.combinedSeed = combinedSeed;
     this.state.rng = await CSRNG.create(combinedSeed);
-    this.state.step = 'SEEDS_REVEALED';
+    this.state.step = 'VERIFIED';
 
-    await this.emit('SEEDS_REVEALED', {
-      local_seed: hexEncode(localSeed),
-      remote_seed: hexEncode(remoteSeed),
-      human_input: this.state.humanInput,
+    await this.emit('COMMITMENTS_VERIFIED', {
       local_verified: localVerified,
       remote_verified: remoteVerified,
       combined_seed: hexEncode(combinedSeed),
@@ -208,7 +248,11 @@ export class Ceremony {
   }
 
   async draw(): Promise<DrawResult> {
-    this.assertStep('SEEDS_REVEALED', 'DRAWING');
+    this.assertStep('VERIFIED', 'DRAWING');
+
+    if (!this.state.parametersLocked) {
+      throw new Error('Parameters must be locked before drawing');
+    }
 
     const { rng, min, max } = this.state;
     if (!rng || min === null || max === null) {
@@ -237,22 +281,7 @@ export class Ceremony {
   }
 
   reset(): void {
-    this.state = {
-      step: 'INIT',
-      localSeed: null,
-      localCommitment: null,
-      remoteSeed: null,
-      remoteCommitment: null,
-      humanInput: null,
-      humanCommitment: null,
-      min: null,
-      max: null,
-      combinedSeed: null,
-      rng: null,
-      draws: [],
-      localVerified: null,
-      remoteVerified: null,
-    };
+    this.state = initialState();
     this.log = new CeremonyLog();
   }
 }

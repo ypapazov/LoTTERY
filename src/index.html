@@ -9,199 +9,263 @@
 <body>
   <div id="app">
     <!-- Toolbar -->
-    <div class="toolbar">
+    <header class="toolbar">
       <h1>LoTTERY</h1>
-      <button id="btn-replay-mode">Replay Mode</button>
-      <button id="btn-presentation">Presentation Mode</button>
-      <button id="btn-export-log">Export Log</button>
-      <button id="btn-self-download">Download HTML</button>
-      <button id="btn-reset" class="danger">Reset</button>
-    </div>
-
-    <!-- Main Panel -->
-    <div class="main-panel" id="live-panel">
-      <div id="step-indicator"></div>
-
-      <!-- Entropy Cards -->
-      <div class="entropy-cards">
-        <div class="entropy-card" id="local-seed-card">
-          <div class="empty">Awaiting local seed…</div>
-        </div>
-        <div class="entropy-card" id="remote-seed-card">
-          <div class="empty">Awaiting remote seed…</div>
-        </div>
-        <div class="entropy-card" id="human-input-card">
-          <div class="empty">Awaiting human input…</div>
-        </div>
+      <div class="toolbar-actions">
+        <button id="btn-replay-mode">Replay</button>
+        <button id="btn-presentation">Presentation</button>
+        <button id="btn-export-log">Export Log</button>
+        <button id="btn-self-download">Download HTML</button>
+        <button id="btn-reset" class="danger">Reset</button>
       </div>
+    </header>
 
-      <!-- QR containers -->
-      <div class="entropy-cards">
-        <div id="local-seed-qr"></div>
-        <div id="remote-seed-qr"></div>
-        <div id="human-input-qr"></div>
-      </div>
+    <!-- Live Ceremony -->
+    <main id="live-panel">
 
-      <!-- XOR Visualization -->
-      <div id="xor-visualization" class="hidden">
-        <div class="xor-inputs">
-          <div class="xor-input-box">
-            <span class="xor-label">Local PBKDF2</span>
-            <span id="xor-local"></span>
+      <!-- ===== Ceremony Phase ===== -->
+      <section class="ceremony-phase">
+
+        <!-- Source Cards — diagonal stagger (left=low, right=high) -->
+        <div class="source-cards">
+
+          <!-- Card 1: Local CSRNG -->
+          <div class="source-card" id="card-local" data-state="empty">
+            <div class="source-qr-wrap">
+              <div class="source-qr" id="local-qr"></div>
+              <span class="info-icon" title="This is a cryptographic lock. It proves this seed was chosen before other inputs were received, without revealing the seed itself.">&#9432;</span>
+            </div>
+            <div class="source-lock" id="local-lock">
+              <svg viewBox="0 0 24 24" width="28" height="28"><use href="#icon-lock-closed"/></svg>
+            </div>
+            <div class="source-value mono" id="local-value">—</div>
+            <div class="source-label">
+              <svg viewBox="0 0 24 24" width="16" height="16"><use href="#icon-chip"/></svg>
+              Local CSRNG
+            </div>
+            <div class="source-action" id="local-action">
+              <button id="btn-generate-local" class="primary">Generate</button>
+            </div>
           </div>
-          <div class="xor-input-box">
-            <span class="xor-label">Remote PBKDF2</span>
-            <span id="xor-remote"></span>
+
+          <!-- Card 2: random.org -->
+          <div class="source-card" id="card-remote" data-state="empty">
+            <div class="source-qr-wrap">
+              <div class="source-qr" id="remote-qr"></div>
+              <span class="info-icon" title="This is a cryptographic lock. It proves this seed was chosen before other inputs were received, without revealing the seed itself.">&#9432;</span>
+            </div>
+            <div class="source-lock" id="remote-lock">
+              <svg viewBox="0 0 24 24" width="28" height="28"><use href="#icon-lock-closed"/></svg>
+            </div>
+            <div class="source-value mono" id="remote-value">—</div>
+            <div class="source-label">
+              <svg viewBox="0 0 24 24" width="16" height="16"><use href="#icon-cloud"/></svg>
+              random.org
+            </div>
+            <div class="source-action" id="remote-action">
+              <button id="btn-fetch-remote" class="primary">Fetch</button>
+              <button id="btn-manual-remote">Manual</button>
+              <div id="manual-remote-input" class="hidden">
+                <input type="text" id="manual-remote-hex" placeholder="64 hex chars (32 bytes)" maxlength="64">
+                <button id="btn-manual-submit" class="primary">OK</button>
+              </div>
+              <div id="remote-error" class="error-message hidden"></div>
+            </div>
           </div>
-          <div class="xor-input-box">
-            <span class="xor-label">Human PBKDF2</span>
-            <span id="xor-human"></span>
+
+          <!-- Card 3: Human Input -->
+          <div class="source-card" id="card-human" data-state="empty">
+            <div class="source-qr-wrap">
+              <div class="source-qr" id="human-qr"></div>
+              <span class="info-icon" title="The spoken input is processed through PBKDF2 to produce this commitment.">&#9432;</span>
+            </div>
+            <div class="source-lock" id="human-lock">
+              <svg viewBox="0 0 24 24" width="28" height="28"><use href="#icon-lock-closed"/></svg>
+            </div>
+            <div class="source-value mono" id="human-value">—</div>
+            <div class="source-label">
+              <svg viewBox="0 0 24 24" width="16" height="16"><use href="#icon-person"/></svg>
+              Human Input
+            </div>
+            <div class="source-action" id="human-action">
+              <input type="text" id="human-input-value" placeholder="Spoken number…">
+              <button id="btn-submit-human" class="primary">Submit</button>
+              <div id="human-error" class="error-message hidden"></div>
+            </div>
           </div>
         </div>
-        <div class="xor-gate">⊕ XOR</div>
-        <div class="xor-output" id="xor-result"></div>
-      </div>
 
-      <!-- Step 1: Generate local seed -->
-      <div class="ceremony-step" id="step-local">
-        <h2>Step 1 — Generate Local Seed</h2>
-        <p>Generate a cryptographically random seed using the Web Crypto API. A PBKDF2 commitment will be computed and displayed.</p>
-        <button id="btn-generate-local" class="primary">Generate Local Seed</button>
-      </div>
+        <!-- XOR Diagram -->
+        <div class="xor-diagram" id="xor-diagram">
+          <svg viewBox="0 0 600 340" preserveAspectRatio="xMidYMid meet">
+            <defs>
+              <g id="xor-gate-ansi">
+                <path fill="none" stroke="currentColor" stroke-width="2" d="M70 25h25M30.38572 15H5M31.3621 35H5"/>
+                <g fill="currentColor" fill-rule="evenodd">
+                  <path d="M24.25 42C22.65263 44.6444 22 45 22 45h-3.65625l2-2.4375S26 35.56245 26 25 20.34375 7.4375 20.34375 7.4375l-2-2.4375H22c.78125.9375 1.42188 1.65625 2.21875 3C26.09147 11.09981 29 17.02665 29 25c0 7.95065-2.8967 13.87942-4.75 17z"/>
+                  <path d="M24.09375 5l2 2.4375S31.75 14.43755 31.75 25s-5.65625 17.5625-5.65625 17.5625l-2 2.4375H41.25c2.40808 0 7.6897.02451 13.625-2.40625s12.53654-7.34327 17.6875-16.875L71.25 25l1.3125-.71875C62.25939 5.21559 46.00657 5 41.25 5H24.09375zm5.875 3H41.25c4.68417 0 18.28685-.1302 27.96875 17C64.45196 33.42907 58.69747 37.68391 53.5 39.8125 48.13934 42.00792 43.65808 42 41.25 42H30c1.87359-3.10843 4.75-9.04935 4.75-17 0-7.97335-2.90853-13.90019-4.78125-17z"/>
+                </g>
+              </g>
+            </defs>
 
-      <!-- Step 2: Remote seed -->
-      <div class="ceremony-step hidden" id="step-remote">
-        <h2>Step 2 — Fetch Remote Seed</h2>
-        <p>Fetch a random value from random.org, or enter one manually if random.org is unreachable.</p>
-        <div style="display: flex; gap: 0.5rem;">
-          <button id="btn-fetch-remote" class="primary">Fetch from random.org</button>
-          <button id="btn-manual-remote">Enter Manually</button>
+            <!-- Source labels -->
+            <text class="xor-src-label" x="100" y="8" text-anchor="middle">Local</text>
+            <text class="xor-src-label" x="300" y="8" text-anchor="middle">Remote</text>
+            <text class="xor-src-label" x="500" y="8" text-anchor="middle">Human</text>
+
+            <!-- Source dots -->
+            <circle class="xor-dot" cx="100" cy="14" r="5"/>
+            <circle class="xor-dot" cx="300" cy="14" r="5"/>
+            <circle class="xor-dot" cx="500" cy="14" r="5"/>
+
+            <!-- Wires: orthogonal only, all 90° bends -->
+            <!-- S1 → Gate1 left input -->
+            <path class="xor-wire" d="M100,14 V24 H185 V32"/>
+            <!-- S2 → Gate1 right input -->
+            <path class="xor-wire" d="M300,14 V24 H215 V32"/>
+            <!-- Gate1 output → Gate2 left input -->
+            <path class="xor-wire" d="M200,168 V172 H335"/>
+            <!-- S3 → Gate2 right input -->
+            <path class="xor-wire" d="M500,14 V172 H365"/>
+            <!-- Gate2 output → combined seed -->
+            <path class="xor-wire" d="M350,308 V318"/>
+
+            <!-- Output dot -->
+            <circle class="xor-dot" cx="350" cy="318" r="5"/>
+
+            <!-- Gate 1: rotated 90° CW, inputs from top, output at bottom -->
+            <use href="#xor-gate-ansi" class="xor-gate" x="0" y="0"
+                 transform="translate(200,100) rotate(90) scale(1.5) translate(-50,-25)"/>
+
+            <!-- Gate 2 -->
+            <use href="#xor-gate-ansi" class="xor-gate" x="0" y="0"
+                 transform="translate(350,240) rotate(90) scale(1.5) translate(-50,-25)"/>
+
+            <!-- Output label -->
+            <text class="xor-output-label" x="350" y="332" text-anchor="middle">Combined Seed</text>
+          </svg>
         </div>
-        <div id="remote-error" class="error-message hidden"></div>
-        <div id="manual-remote-input" class="hidden" style="margin-top: 0.75rem;">
-          <p style="margin-bottom: 0.5rem;">Enter 64 hex characters (32 bytes):</p>
-          <div class="input-row">
-            <input type="text" id="manual-remote-hex" placeholder="e.g. a1b2c3d4..." maxlength="64">
-            <button id="btn-manual-submit" class="primary">Submit</button>
-          </div>
-        </div>
-      </div>
 
-      <!-- Step 3: Lock parameters -->
-      <div class="ceremony-step hidden" id="step-parameters">
-        <h2>Step 3 — Lock Parameters</h2>
-        <p>Set the minimum and maximum values for the output range. These will be visible to the audience.</p>
-        <div class="input-row">
+        <!-- Range Panel -->
+        <div class="range-panel" id="range-panel">
           <label for="param-min">Min</label>
           <input type="number" id="param-min" value="1">
           <label for="param-max">Max</label>
           <input type="number" id="param-max" value="100">
-          <button id="btn-lock-params" class="primary">Lock Range</button>
+          <button id="btn-lock-params" class="lock-btn" title="Lock range">
+            <svg viewBox="0 0 24 24" width="20" height="20"><use href="#icon-lock-open"/></svg>
+          </button>
+          <div id="param-error" class="error-message hidden"></div>
         </div>
-        <div id="locked-range" class="hidden" style="margin-top: 0.5rem; color: var(--green); font-weight: 600;"></div>
-        <div id="param-error" class="error-message hidden"></div>
+
+        <!-- Action Buttons -->
+        <div class="action-buttons">
+          <button id="btn-reveal" class="action-btn" disabled>Reveal Seeds</button>
+          <button id="btn-verify" class="action-btn" disabled>Verify Commitments</button>
+          <button id="btn-generate" class="action-btn primary" disabled>Generate</button>
+        </div>
+
+      </section>
+
+      <!-- ===== Output Phase ===== -->
+      <section class="output-phase hidden" id="output-phase">
+        <div id="results-area"></div>
+      </section>
+
+      <!-- Sticky Draw Button -->
+      <div class="draw-bar hidden" id="draw-bar">
+        <button id="btn-draw-next" class="primary draw-btn">Draw Next</button>
       </div>
 
-      <!-- Step 4: Human input -->
-      <div class="ceremony-step hidden" id="step-human">
-        <h2>Step 4 — Human Input</h2>
-        <p>A designated person speaks a random number aloud. Enter it here after the audience has heard it.</p>
-        <div class="input-row">
-          <input type="text" id="human-input-value" placeholder="Enter the spoken number…">
-          <button id="btn-submit-human" class="primary">Submit</button>
-        </div>
-        <div id="human-error" class="error-message hidden"></div>
-      </div>
-
-      <!-- Step 5: Reveal -->
-      <div class="ceremony-step hidden" id="step-reveal">
-        <h2>Step 5 — Reveal &amp; Verify Seeds</h2>
-        <p>The local and remote seeds are now revealed. The application verifies they match the earlier commitments.</p>
-        <button id="btn-reveal" class="primary">Reveal Seeds</button>
-      </div>
-
-      <!-- Step 6+: Draw -->
-      <div class="ceremony-step hidden" id="step-draw">
-        <h2>Step 6 — Draw Numbers</h2>
-        <p>Each draw uses the next output from the CSRNG seeded by the XOR of all three sources.</p>
-        <div id="draw-result-panel" class="hidden">
-          <div id="draw-count"></div>
-          <div id="draw-result"></div>
-        </div>
-        <div id="rejection-notice" class="hidden"></div>
-        <button id="btn-draw" class="primary" style="margin-top: 0.5rem;">Draw Number</button>
-        <div id="draw-history" style="margin-top: 1rem;"></div>
-      </div>
-    </div>
+    </main>
 
     <!-- Replay Panel -->
-    <div class="main-panel hidden" id="replay-panel">
-      <h2>Replay Mode</h2>
-      <p style="color: var(--text-muted); margin-bottom: 1rem;">
-        Enter the seeds and parameters from an exported ceremony log to independently verify the results.
-      </p>
+    <main id="replay-panel" class="hidden">
+      <section class="ceremony-phase replay-banner">
+        <div class="replay-notice">Replay / Verification Mode</div>
 
-      <div class="replay-section">
-        <h3>Local Seed</h3>
-        <div class="input-row"><input type="text" id="replay-local-seed" placeholder="Hex seed (64 chars)"></div>
-        <div class="input-row">
-          <label>Salt</label><input type="text" id="replay-local-salt" placeholder="Hex salt (64 chars)">
+        <div class="source-cards replay-cards">
+          <div class="source-card replay-input-card">
+            <div class="source-label"><svg viewBox="0 0 24 24" width="16" height="16"><use href="#icon-chip"/></svg> Local Seed</div>
+            <input type="text" id="replay-local-seed" placeholder="Hex seed (64 chars)" class="mono">
+            <input type="text" id="replay-local-salt" placeholder="Salt (64 hex)" class="mono">
+            <input type="number" id="replay-local-iter" value="600000" class="small-input">
+          </div>
+          <div class="source-card replay-input-card">
+            <div class="source-label"><svg viewBox="0 0 24 24" width="16" height="16"><use href="#icon-cloud"/></svg> Remote Seed</div>
+            <input type="text" id="replay-remote-seed" placeholder="Hex seed (64 chars)" class="mono">
+            <input type="text" id="replay-remote-salt" placeholder="Salt (64 hex)" class="mono">
+            <input type="number" id="replay-remote-iter" value="600000" class="small-input">
+          </div>
+          <div class="source-card replay-input-card">
+            <div class="source-label"><svg viewBox="0 0 24 24" width="16" height="16"><use href="#icon-person"/></svg> Human Input</div>
+            <input type="text" id="replay-human-input" placeholder="Original spoken value">
+            <input type="text" id="replay-human-salt" placeholder="Salt (64 hex)" class="mono">
+            <input type="number" id="replay-human-iter" value="600000" class="small-input">
+          </div>
         </div>
-        <div class="input-row">
-          <label>Iter</label><input type="number" id="replay-local-iter" value="600000">
+
+        <div class="range-panel">
+          <label>Min</label>
+          <input type="number" id="replay-min" value="1">
+          <label>Max</label>
+          <input type="number" id="replay-max" value="100">
+          <label>Draws</label>
+          <input type="number" id="replay-draw-count" value="1" class="small-input">
         </div>
+
+        <div class="action-buttons">
+          <button id="btn-replay-run" class="action-btn primary">Run Replay</button>
+        </div>
+
+        <div id="replay-error" class="error-message hidden"></div>
+        <div id="replay-results" class="hidden"></div>
+      </section>
+    </main>
+
+    <!-- Log Drawer -->
+    <div class="log-drawer" id="log-drawer">
+      <button class="log-toggle" id="btn-log-toggle">Log ▲</button>
+      <div class="log-content" id="log-content">
+        <div class="log-chain-qr" id="log-chain-qr"></div>
+        <div id="log-entries"></div>
       </div>
-
-      <div class="replay-section">
-        <h3>Remote Seed</h3>
-        <div class="input-row"><input type="text" id="replay-remote-seed" placeholder="Hex seed (64 chars)"></div>
-        <div class="input-row">
-          <label>Salt</label><input type="text" id="replay-remote-salt" placeholder="Hex salt (64 chars)">
-        </div>
-        <div class="input-row">
-          <label>Iter</label><input type="number" id="replay-remote-iter" value="600000">
-        </div>
-      </div>
-
-      <div class="replay-section">
-        <h3>Human Input</h3>
-        <div class="input-row"><input type="text" id="replay-human-input" placeholder="Original spoken value"></div>
-        <div class="input-row">
-          <label>Salt</label><input type="text" id="replay-human-salt" placeholder="Hex salt (64 chars)">
-        </div>
-        <div class="input-row">
-          <label>Iter</label><input type="number" id="replay-human-iter" value="600000">
-        </div>
-      </div>
-
-      <div class="replay-section">
-        <h3>Parameters</h3>
-        <div class="input-row">
-          <label>Min</label><input type="number" id="replay-min" value="1">
-          <label>Max</label><input type="number" id="replay-max" value="100">
-          <label>Draws</label><input type="number" id="replay-draw-count" value="1">
-        </div>
-      </div>
-
-      <button id="btn-replay-run" class="primary" style="width: 100%;">Run Replay</button>
-
-      <div id="replay-error" class="error-message hidden" style="margin-top: 0.5rem;"></div>
-      <div id="replay-results" class="hidden" style="margin-top: 1rem;"></div>
-    </div>
-
-    <!-- Log Panel -->
-    <div class="log-panel">
-      <div class="log-panel-header">Ceremony Log</div>
-      <div id="log-entries"></div>
     </div>
   </div>
 
-  <!-- Processing Indicator Overlay -->
+  <!-- Processing Indicator -->
   <div id="processing-indicator" class="hidden">
     <div class="spinner-container">
       <div class="spinner"></div>
       <div id="processing-message"></div>
     </div>
   </div>
+
+  <!-- SVG Icon Defs -->
+  <svg style="display:none">
+    <defs>
+      <symbol id="icon-lock-closed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+      </symbol>
+      <symbol id="icon-lock-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/>
+      </symbol>
+      <symbol id="icon-chip" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/>
+      </symbol>
+      <symbol id="icon-cloud" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>
+      </symbol>
+      <symbol id="icon-person" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+      </symbol>
+      <symbol id="icon-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="20 6 9 17 4 12"/>
+      </symbol>
+      <symbol id="icon-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+      </symbol>
+    </defs>
+  </svg>
 </body>
 </html>
