@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="bg">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>LoTTERY — Public Verifiable RNG Ceremony</title>
+  <title>LoTTERY — Публична верифицируема RNG церемония</title>
   <script type="module" src="./main.ts"></script>
 </head>
 <body>
@@ -12,13 +12,23 @@
     <header class="toolbar">
       <h1>LoTTERY</h1>
       <div class="toolbar-actions">
-        <button id="btn-replay-mode">Replay</button>
-        <button id="btn-presentation">Presentation</button>
-        <button id="btn-export-log">Export Log</button>
-        <button id="btn-self-download">Download HTML</button>
-        <button id="btn-reset" class="danger">Reset</button>
+        <button id="btn-lang" class="lang-btn" title="EN / BG">EN</button>
+        <button id="btn-replay-mode" data-i18n="toolbar.replay">Повторение</button>
+        <button id="btn-presentation" data-i18n="toolbar.presentation">Презентация</button>
+        <button id="btn-export-log" data-i18n="toolbar.export">Експорт на лог</button>
+        <button id="btn-import-log" data-i18n="toolbar.import">Импорт на лог</button>
+        <input type="file" id="import-log-file" accept=".json" class="hidden">
+        <button id="btn-self-download" data-i18n="toolbar.download">Изтегляне на HTML</button>
+        <button id="btn-reset" class="danger" data-i18n="toolbar.reset">Нулиране</button>
       </div>
     </header>
+
+    <!-- Sticky QR strip (visible when source cards scroll out of view) -->
+    <div class="qr-strip hidden" id="qr-strip">
+      <div class="qr-strip-item" id="strip-local-qr"></div>
+      <div class="qr-strip-item" id="strip-remote-qr"></div>
+      <div class="qr-strip-item" id="strip-human-qr"></div>
+    </div>
 
     <!-- Live Ceremony -->
     <main id="live-panel">
@@ -26,14 +36,14 @@
       <!-- ===== Ceremony Phase ===== -->
       <section class="ceremony-phase">
 
-        <!-- Source Cards — diagonal stagger (left=low, right=high) -->
-        <div class="source-cards">
+        <!-- Source Cards — diagonal stagger (left=high, right=low) -->
+        <div class="source-cards" id="source-cards">
 
           <!-- Card 1: Local CSRNG -->
           <div class="source-card" id="card-local" data-state="empty">
             <div class="source-qr-wrap">
               <div class="source-qr" id="local-qr"></div>
-              <span class="info-icon" title="This is a cryptographic lock. It proves this seed was chosen before other inputs were received, without revealing the seed itself.">&#9432;</span>
+              <span class="info-icon" data-i18n-title="info.commitment" title="Това е криптографско заключване. То доказва, че този seed е бил избран преди другите входове да бъдат получени, без да разкрива самия seed.">&#9432;</span>
             </div>
             <div class="source-lock" id="local-lock">
               <svg viewBox="0 0 24 24" width="28" height="28"><use href="#icon-lock-closed"/></svg>
@@ -41,10 +51,10 @@
             <div class="source-value mono" id="local-value">—</div>
             <div class="source-label">
               <svg viewBox="0 0 24 24" width="16" height="16"><use href="#icon-chip"/></svg>
-              Local CSRNG
+              <span data-i18n="card.local.label">Локален CSRNG</span>
             </div>
             <div class="source-action" id="local-action">
-              <button id="btn-generate-local" class="primary">Generate</button>
+              <button id="btn-generate-local" class="primary" data-i18n="card.local.generate">Генерирай</button>
             </div>
           </div>
 
@@ -52,7 +62,7 @@
           <div class="source-card" id="card-remote" data-state="empty">
             <div class="source-qr-wrap">
               <div class="source-qr" id="remote-qr"></div>
-              <span class="info-icon" title="This is a cryptographic lock. It proves this seed was chosen before other inputs were received, without revealing the seed itself.">&#9432;</span>
+              <span class="info-icon" data-i18n-title="info.commitment" title="Това е криптографско заключване. То доказва, че този seed е бил избран преди другите входове да бъдат получени, без да разкрива самия seed.">&#9432;</span>
             </div>
             <div class="source-lock" id="remote-lock">
               <svg viewBox="0 0 24 24" width="28" height="28"><use href="#icon-lock-closed"/></svg>
@@ -60,14 +70,14 @@
             <div class="source-value mono" id="remote-value">—</div>
             <div class="source-label">
               <svg viewBox="0 0 24 24" width="16" height="16"><use href="#icon-cloud"/></svg>
-              random.org
+              <span data-i18n="card.remote.label">random.org</span>
             </div>
             <div class="source-action" id="remote-action">
-              <button id="btn-fetch-remote" class="primary">Fetch</button>
-              <button id="btn-manual-remote">Manual</button>
+              <button id="btn-fetch-remote" class="primary" data-i18n="card.remote.fetch">Извличане</button>
+              <button id="btn-manual-remote" data-i18n="card.remote.manual">Ръчно</button>
               <div id="manual-remote-input" class="hidden">
-                <input type="text" id="manual-remote-hex" placeholder="64 hex chars (32 bytes)" maxlength="64">
-                <button id="btn-manual-submit" class="primary">OK</button>
+                <input type="text" id="manual-remote-hex" data-i18n-placeholder="card.remote.manual_placeholder" placeholder="64 hex символа (32 байта)" maxlength="64">
+                <button id="btn-manual-submit" class="primary" data-i18n="card.remote.manual_ok">ОК</button>
               </div>
               <div id="remote-error" class="error-message hidden"></div>
             </div>
@@ -77,7 +87,7 @@
           <div class="source-card" id="card-human" data-state="empty">
             <div class="source-qr-wrap">
               <div class="source-qr" id="human-qr"></div>
-              <span class="info-icon" title="The spoken input is processed through PBKDF2 to produce this commitment.">&#9432;</span>
+              <span class="info-icon" data-i18n-title="info.human_commitment" title="Казаният вход се обработва чрез PBKDF2, за да се получи този commitment.">&#9432;</span>
             </div>
             <div class="source-lock" id="human-lock">
               <svg viewBox="0 0 24 24" width="28" height="28"><use href="#icon-lock-closed"/></svg>
@@ -85,11 +95,11 @@
             <div class="source-value mono" id="human-value">—</div>
             <div class="source-label">
               <svg viewBox="0 0 24 24" width="16" height="16"><use href="#icon-person"/></svg>
-              Human Input
+              <span data-i18n="card.human.label">Човешки вход</span>
             </div>
             <div class="source-action" id="human-action">
-              <input type="text" id="human-input-value" placeholder="Spoken number…">
-              <button id="btn-submit-human" class="primary">Submit</button>
+              <input type="text" id="human-input-value" data-i18n-placeholder="card.human.placeholder" placeholder="Казано число…">
+              <button id="btn-submit-human" class="primary" data-i18n="card.human.submit">Изпрати</button>
               <div id="human-error" class="error-message hidden"></div>
             </div>
           </div>
@@ -109,9 +119,9 @@
             </defs>
 
             <!-- Source labels -->
-            <text class="xor-src-label" x="100" y="8" text-anchor="middle">Local</text>
-            <text class="xor-src-label" x="300" y="8" text-anchor="middle">Remote</text>
-            <text class="xor-src-label" x="500" y="8" text-anchor="middle">Human</text>
+            <text class="xor-src-label" x="100" y="8" text-anchor="middle" data-i18n="xor.local">Локален</text>
+            <text class="xor-src-label" x="300" y="8" text-anchor="middle" data-i18n="xor.remote">Отдалечен</text>
+            <text class="xor-src-label" x="500" y="8" text-anchor="middle" data-i18n="xor.human">Човешки</text>
 
             <!-- Source dots -->
             <circle class="xor-dot" cx="100" cy="14" r="5"/>
@@ -119,15 +129,10 @@
             <circle class="xor-dot" cx="500" cy="14" r="5"/>
 
             <!-- Wires: orthogonal only, all 90° bends -->
-            <!-- S1 → Gate1 left input -->
             <path class="xor-wire" d="M100,14 V24 H185 V32"/>
-            <!-- S2 → Gate1 right input -->
             <path class="xor-wire" d="M300,14 V24 H215 V32"/>
-            <!-- Gate1 output → Gate2 left input -->
             <path class="xor-wire" d="M200,168 V172 H335"/>
-            <!-- S3 → Gate2 right input -->
             <path class="xor-wire" d="M500,14 V172 H365"/>
-            <!-- Gate2 output → combined seed -->
             <path class="xor-wire" d="M350,308 V318"/>
 
             <!-- Output dot -->
@@ -142,17 +147,17 @@
                  transform="translate(350,240) rotate(90) scale(1.5) translate(-50,-25)"/>
 
             <!-- Output label -->
-            <text class="xor-output-label" x="350" y="332" text-anchor="middle">Combined Seed</text>
+            <text class="xor-output-label" x="350" y="332" text-anchor="middle" data-i18n="xor.combined">Комбиниран Seed</text>
           </svg>
         </div>
 
         <!-- Range Panel -->
         <div class="range-panel" id="range-panel">
-          <label for="param-min">Min</label>
+          <label for="param-min" data-i18n="range.min">Мин</label>
           <input type="number" id="param-min" value="1">
-          <label for="param-max">Max</label>
+          <label for="param-max" data-i18n="range.max">Макс</label>
           <input type="number" id="param-max" value="100">
-          <button id="btn-lock-params" class="lock-btn" title="Lock range">
+          <button id="btn-lock-params" class="lock-btn" data-i18n-title="range.lock_title" title="Заключване на диапазон">
             <svg viewBox="0 0 24 24" width="20" height="20"><use href="#icon-lock-open"/></svg>
           </button>
           <div id="param-error" class="error-message hidden"></div>
@@ -160,9 +165,9 @@
 
         <!-- Action Buttons -->
         <div class="action-buttons">
-          <button id="btn-reveal" class="action-btn" disabled>Reveal Seeds</button>
-          <button id="btn-verify" class="action-btn" disabled>Verify Commitments</button>
-          <button id="btn-generate" class="action-btn primary" disabled>Generate</button>
+          <button id="btn-reveal" class="action-btn" disabled data-i18n="btn.reveal">Разкриване на Seeds</button>
+          <button id="btn-verify" class="action-btn" disabled data-i18n="btn.verify">Проверка на Commitments</button>
+          <button id="btn-generate" class="action-btn primary" disabled data-i18n="btn.generate">Генерирай</button>
         </div>
 
       </section>
@@ -174,7 +179,7 @@
 
       <!-- Sticky Draw Button -->
       <div class="draw-bar hidden" id="draw-bar">
-        <button id="btn-draw-next" class="primary draw-btn">Draw Next</button>
+        <button id="btn-draw-next" class="primary draw-btn" data-i18n="btn.draw_next">Следващо теглене</button>
       </div>
 
     </main>
@@ -182,40 +187,43 @@
     <!-- Replay Panel -->
     <main id="replay-panel" class="hidden">
       <section class="ceremony-phase replay-banner">
-        <div class="replay-notice">Replay / Verification Mode</div>
+        <div class="replay-notice" data-i18n="replay.notice">Режим на повторение / Верификация</div>
 
         <div class="source-cards replay-cards">
           <div class="source-card replay-input-card">
-            <div class="source-label"><svg viewBox="0 0 24 24" width="16" height="16"><use href="#icon-chip"/></svg> Local Seed</div>
-            <input type="text" id="replay-local-seed" placeholder="Hex seed (64 chars)" class="mono">
-            <input type="text" id="replay-local-salt" placeholder="Salt (64 hex)" class="mono">
+            <div class="source-label"><svg viewBox="0 0 24 24" width="16" height="16"><use href="#icon-chip"/></svg> <span data-i18n="replay.local_seed">Локален Seed</span></div>
+            <div class="replay-qr" id="replay-local-qr"></div>
+            <input type="text" id="replay-local-seed" data-i18n-placeholder="replay.seed_placeholder" placeholder="Hex seed (64 символа)" class="mono">
+            <input type="text" id="replay-local-salt" data-i18n-placeholder="replay.salt_placeholder" placeholder="Salt (64 hex)" class="mono">
             <input type="number" id="replay-local-iter" value="600000" class="small-input">
           </div>
           <div class="source-card replay-input-card">
-            <div class="source-label"><svg viewBox="0 0 24 24" width="16" height="16"><use href="#icon-cloud"/></svg> Remote Seed</div>
-            <input type="text" id="replay-remote-seed" placeholder="Hex seed (64 chars)" class="mono">
-            <input type="text" id="replay-remote-salt" placeholder="Salt (64 hex)" class="mono">
+            <div class="source-label"><svg viewBox="0 0 24 24" width="16" height="16"><use href="#icon-cloud"/></svg> <span data-i18n="replay.remote_seed">Отдалечен Seed</span></div>
+            <div class="replay-qr" id="replay-remote-qr"></div>
+            <input type="text" id="replay-remote-seed" data-i18n-placeholder="replay.seed_placeholder" placeholder="Hex seed (64 символа)" class="mono">
+            <input type="text" id="replay-remote-salt" data-i18n-placeholder="replay.salt_placeholder" placeholder="Salt (64 hex)" class="mono">
             <input type="number" id="replay-remote-iter" value="600000" class="small-input">
           </div>
           <div class="source-card replay-input-card">
-            <div class="source-label"><svg viewBox="0 0 24 24" width="16" height="16"><use href="#icon-person"/></svg> Human Input</div>
-            <input type="text" id="replay-human-input" placeholder="Original spoken value">
-            <input type="text" id="replay-human-salt" placeholder="Salt (64 hex)" class="mono">
+            <div class="source-label"><svg viewBox="0 0 24 24" width="16" height="16"><use href="#icon-person"/></svg> <span data-i18n="replay.human_input">Човешки вход</span></div>
+            <div class="replay-qr" id="replay-human-qr"></div>
+            <input type="text" id="replay-human-input" data-i18n-placeholder="replay.human_placeholder" placeholder="Оригинална казана стойност">
+            <input type="text" id="replay-human-salt" data-i18n-placeholder="replay.salt_placeholder" placeholder="Salt (64 hex)" class="mono">
             <input type="number" id="replay-human-iter" value="600000" class="small-input">
           </div>
         </div>
 
         <div class="range-panel">
-          <label>Min</label>
+          <label data-i18n="range.min">Мин</label>
           <input type="number" id="replay-min" value="1">
-          <label>Max</label>
+          <label data-i18n="range.max">Макс</label>
           <input type="number" id="replay-max" value="100">
-          <label>Draws</label>
+          <label data-i18n="range.draws">Тегления</label>
           <input type="number" id="replay-draw-count" value="1" class="small-input">
         </div>
 
         <div class="action-buttons">
-          <button id="btn-replay-run" class="action-btn primary">Run Replay</button>
+          <button id="btn-replay-run" class="action-btn primary" data-i18n="replay.run">Стартирай повторение</button>
         </div>
 
         <div id="replay-error" class="error-message hidden"></div>
@@ -223,13 +231,9 @@
       </section>
     </main>
 
-    <!-- Log Drawer -->
-    <div class="log-drawer" id="log-drawer">
-      <button class="log-toggle" id="btn-log-toggle">Log ▲</button>
-      <div class="log-content" id="log-content">
-        <div class="log-chain-qr" id="log-chain-qr"></div>
-        <div id="log-entries"></div>
-      </div>
+    <!-- Log Window trigger (opens a child window) -->
+    <div class="log-bar" id="log-bar">
+      <button class="log-toggle" id="btn-log-toggle" data-i18n="log.up">Лог ▲</button>
     </div>
   </div>
 

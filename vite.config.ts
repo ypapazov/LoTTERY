@@ -1,8 +1,8 @@
 import { defineConfig } from 'vite';
 import { viteSingleFile } from 'vite-plugin-singlefile';
 import { createHash } from 'crypto';
-import { readFileSync } from 'fs';
-import { resolve } from 'path';
+import { readFileSync, writeFileSync, readdirSync, statSync } from 'fs';
+import { resolve, join } from 'path';
 import buildConfig from './build.config';
 
 function computeQrLibraryHash(): string {
@@ -37,6 +37,22 @@ export default defineConfig({
           `     This library is embedded inline and is part of the auditable surface. -->`,
         ].join('\n');
         return html.replace('</head>', `${comment}\n</head>`);
+      },
+    },
+    {
+      name: 'generate-sha256sums',
+      closeBundle() {
+        const distDir = resolve(__dirname, 'dist');
+        const lines: string[] = [];
+        for (const file of readdirSync(distDir)) {
+          const fullPath = join(distDir, file);
+          if (!statSync(fullPath).isFile() || file === 'SHA256SUMS') continue;
+          const hash = createHash('sha256').update(readFileSync(fullPath)).digest('hex');
+          lines.push(`${hash}  ${file}`);
+        }
+        const content = lines.join('\n') + '\n';
+        writeFileSync(join(distDir, 'SHA256SUMS'), content);
+        console.log(`\nSHA256SUMS generated:\n${content}`);
       },
     },
   ],

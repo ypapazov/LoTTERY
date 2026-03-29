@@ -303,7 +303,15 @@ export async function replayCeremony(
   remoteIterations: number,
   humanSalt: Uint8Array,
   humanIterations: number,
-): Promise<{ draws: DrawResult[]; log: CeremonyLog }> {
+): Promise<{
+  draws: DrawResult[];
+  log: CeremonyLog;
+  commitments: {
+    localPbkdf2: Uint8Array; localSalt: Uint8Array; localIterations: number;
+    remotePbkdf2: Uint8Array; remoteSalt: Uint8Array; remoteIterations: number;
+    humanPbkdf2: Uint8Array; humanSalt: Uint8Array; humanIterations: number;
+  };
+}> {
   const localSeed = hexDecode(localSeedHex);
   const remoteSeed = hexDecode(remoteSeedHex);
   const humanBytes = textToBytes(humanInput);
@@ -321,5 +329,12 @@ export async function replayCeremony(
   }
 
   const log = new CeremonyLog();
-  return { draws, log };
+  return {
+    draws, log,
+    commitments: {
+      localPbkdf2, localSalt, localIterations,
+      remotePbkdf2, remoteSalt, remoteIterations,
+      humanPbkdf2, humanSalt, humanIterations,
+    },
+  };
 }

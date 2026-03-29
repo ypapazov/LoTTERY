@@ -3,6 +3,7 @@ import { fetchRandomOrg, manualEntry } from './random-org';
 import { hexEncode } from './crypto';
 import { renderQRCode, renderQRCodeLarge } from './qr';
 import type { LogEntry } from './log';
+import { t, getLocale, setLocale, initI18n } from './i18n';
 
 declare const __DISTRIBUTION_URL__: string;
 
@@ -32,40 +33,100 @@ function hideProcessing(): void {
   hide('processing-indicator');
 }
 
-// ——— Log ———
+// ——— Log (child window) ———
+
+let logWindow: Window | null = null;
+const pendingLogEntries: LogEntry[] = [];
+
+function getLogWindowHTML(): string {
+  return `<!DOCTYPE html>
+<html lang="${document.documentElement.lang}">
+<head><meta charset="UTF-8"><title>LoTTERY — Log</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;background:#0d1117;color:#e6edf3;font-size:14px;padding:0.5rem}
+.chain-qr{text-align:center;padding:0.5rem;border-bottom:1px solid #30363d;margin-bottom:0.5rem}
+.chain-qr:empty{display:none}
+.chain-qr img{image-rendering:pixelated;max-width:160px;background:#fff;padding:4px;border-radius:4px}
+.entry{padding:0.4rem 0.5rem;border-bottom:1px solid #30363d}
+.entry-header{font-family:'SF Mono','Cascadia Code','Fira Code',monospace;font-size:0.75rem;color:#58a6ff}
+.entry-payload{font-family:'SF Mono','Cascadia Code','Fira Code',monospace;font-size:0.65rem;color:#8b949e;margin:0.15rem 0;white-space:pre-wrap}
+.entry-hash{font-family:'SF Mono','Cascadia Code','Fira Code',monospace;font-size:0.6rem;color:#8b949e;word-break:break-all}
+</style></head>
+<body><div id="chain-qr"></div><div id="entries"></div>
+<script>
+window.addEventListener('message',function(e){
+  if(e.data&&e.data.type==='log-entry'){
+    var d=e.data.entry;
+    var el=document.createElement('div');el.className='entry';
+    var h=document.createElement('div');h.className='entry-header';
+    h.textContent='#'+d.sequence+' ['+d.timestamp+'] '+d.event_type;
+    el.appendChild(h);
+    var p=document.createElement('pre');p.className='entry-payload';
+    p.textContent=JSON.stringify(d.payload,null,2);
+    el.appendChild(p);
+    var c=document.createElement('div');c.className='entry-hash';
+    c.textContent='Chain: '+d.chain_hash;
+    el.appendChild(c);
+    document.getElementById('entries').appendChild(el);
+    el.scrollIntoView({behavior:'smooth'});
+  }
+  if(e.data&&e.data.type==='chain-qr'){
+    document.getElementById('chain-qr').innerHTML=e.data.html;
+  }
+});
+window.opener&&window.opener.postMessage({type:'log-ready'},'*');
+</script></body></html>`;
+}
+
+function openLogWindow(): void {
+  if (logWindow && !logWindow.closed) {
+    logWindow.focus();
+    return;
+  }
+  logWindow = window.open('', 'lottery-log', 'width=520,height=600,scrollbars=yes,resizable=yes');
+  if (!logWindow) return;
+  logWindow.document.open();
+  logWindow.document.write(getLogWindowHTML());
+  logWindow.document.close();
+
+  const flush = () => {
+    for (const entry of pendingLogEntries) {
+      logWindow!.postMessage({ type: 'log-entry', entry }, '*');
+    }
+    pendingLogEntries.length = 0;
+  };
+
+  window.addEventListener('message', function handler(e) {
+    if (e.data?.type === 'log-ready') {
+      flush();
+      window.removeEventListener('message', handler);
+    }
+  });
+
+  logWindow.addEventListener('beforeunload', () => {
+    $('btn-log-toggle').classList.remove('active');
+  });
+}
 
 function appendLogEntry(entry: LogEntry): void {
-  const panel = $('log-entries');
-  const div = document.createElement('div');
-  div.className = 'log-entry';
-
-  const header = document.createElement('div');
-  header.className = 'log-entry-header';
-  header.textContent = `#${entry.sequence} [${entry.timestamp}] ${entry.event_type}`;
-  div.appendChild(header);
-
-  const payload = document.createElement('pre');
-  payload.className = 'log-entry-payload';
-  payload.textContent = JSON.stringify(entry.payload, null, 2);
-  div.appendChild(payload);
-
-  const hash = document.createElement('div');
-  hash.className = 'log-entry-hash';
-  hash.textContent = `Chain: ${entry.chain_hash}`;
-  div.appendChild(hash);
-
-  panel.appendChild(div);
-  panel.scrollTop = panel.scrollHeight;
-
+  if (logWindow && !logWindow.closed) {
+    logWindow.postMessage({ type: 'log-entry', entry }, '*');
+  } else {
+    pendingLogEntries.push(entry);
+  }
   updateChainQR(entry.chain_hash);
 }
 
 function updateChainQR(chainHash: string): void {
-  const container = $('log-chain-qr');
+  const tempDiv = document.createElement('div');
   if (presentationMode) {
-    renderQRCodeLarge(chainHash, container);
+    renderQRCodeLarge(chainHash, tempDiv);
   } else {
-    renderQRCode(chainHash, container);
+    renderQRCode(chainHash, tempDiv);
+  }
+  if (logWindow && !logWindow.closed) {
+    logWindow.postMessage({ type: 'chain-qr', html: tempDiv.innerHTML }, '*');
   }
 }
 
@@ -105,6 +166,18 @@ function renderCommitment(
   }
 }
 
+function syncStripQR(sourceQrId: string, stripId: string): void {
+  const source = $(sourceQrId);
+  const strip = $(stripId);
+  const img = source.querySelector('.qr-code') as HTMLImageElement | null;
+  if (img) {
+    strip.innerHTML = '';
+    const clone = img.cloneNode(true) as HTMLImageElement;
+    strip.appendChild(clone);
+    $('qr-strip').classList.remove('hidden');
+  }
+}
+
 function renderRevealed(valueId: string, seedHex: string): void {
   setText(valueId, seedHex);
 }
@@ -125,12 +198,13 @@ function setLockIcon(lockId: string, icon: 'closed' | 'open' | 'check' | 'x'): v
 async function handleGenerateLocal(): Promise<void> {
   setCardState('card-local', 'active');
   ($('btn-generate-local') as HTMLButtonElement).disabled = true;
-  showProcessing('Computing cryptographic commitment \u2014 this deliberate delay prevents brute-force attacks. Please wait\u2026');
+  showProcessing(t('processing.commitment'));
 
   try {
     const c = await ceremony.generateLocalSeed();
     renderCommitment('local-qr', 'local-value',
       hexEncode(c.pbkdf2Output), hexEncode(c.salt), c.iterations);
+    syncStripQR('local-qr', 'strip-local-qr');
     setLockIcon('local-lock', 'closed');
     setCardState('card-local', 'committed');
     hide('local-action');
@@ -145,14 +219,15 @@ async function handleGenerateLocal(): Promise<void> {
 async function handleFetchRemote(): Promise<void> {
   ($('btn-fetch-remote') as HTMLButtonElement).disabled = true;
   ($('btn-manual-remote') as HTMLButtonElement).disabled = true;
-  showProcessing('Fetching entropy from random.org\u2026');
+  showProcessing(t('processing.fetch'));
 
   try {
     const result = await fetchRandomOrg();
-    showProcessing('Computing cryptographic commitment \u2014 this deliberate delay prevents brute-force attacks. Please wait\u2026');
+    showProcessing(t('processing.commitment'));
     const c = await ceremony.setRemoteSeed(result.seedHex);
     renderCommitment('remote-qr', 'remote-value',
       hexEncode(c.pbkdf2Output), hexEncode(c.salt), c.iterations);
+    syncStripQR('remote-qr', 'strip-remote-qr');
     setLockIcon('remote-lock', 'closed');
     setCardState('card-remote', 'committed');
     hide('remote-action');
@@ -161,7 +236,7 @@ async function handleFetchRemote(): Promise<void> {
   } catch (e) {
     ($('btn-fetch-remote') as HTMLButtonElement).disabled = false;
     ($('btn-manual-remote') as HTMLButtonElement).disabled = false;
-    setText('remote-error', `Failed: ${(e as Error).message}. Use manual entry.`);
+    setText('remote-error', `${t('error.failed_prefix')} ${(e as Error).message}. ${t('error.use_manual')}`);
     show('remote-error');
   } finally {
     hideProcessing();
@@ -178,11 +253,12 @@ async function handleManualSubmit(): Promise<void> {
   try {
     const result = manualEntry(hex);
     ($('btn-manual-submit') as HTMLButtonElement).disabled = true;
-    showProcessing('Computing cryptographic commitment \u2014 this deliberate delay prevents brute-force attacks. Please wait\u2026');
+    showProcessing(t('processing.commitment'));
 
     const c = await ceremony.setRemoteSeed(result.seedHex);
     renderCommitment('remote-qr', 'remote-value',
       hexEncode(c.pbkdf2Output), hexEncode(c.salt), c.iterations);
+    syncStripQR('remote-qr', 'strip-remote-qr');
     setLockIcon('remote-lock', 'closed');
     setCardState('card-remote', 'committed');
     hide('remote-action');
@@ -200,18 +276,19 @@ async function handleManualSubmit(): Promise<void> {
 async function handleHumanInput(): Promise<void> {
   const input = ($('human-input-value') as HTMLInputElement).value.trim();
   if (!input) {
-    setText('human-error', 'Please enter a value');
+    setText('human-error', t('error.enter_value'));
     show('human-error');
     return;
   }
 
   ($('btn-submit-human') as HTMLButtonElement).disabled = true;
-  showProcessing('Computing cryptographic commitment \u2014 this deliberate delay prevents brute-force attacks. Please wait\u2026');
+  showProcessing(t('processing.commitment'));
 
   try {
     const c = await ceremony.receiveHumanInput(input);
     renderCommitment('human-qr', 'human-value',
       hexEncode(c.pbkdf2Output), hexEncode(c.salt), c.iterations);
+    syncStripQR('human-qr', 'strip-human-qr');
     setLockIcon('human-lock', 'closed');
     setCardState('card-human', 'committed');
     hide('human-action');
@@ -261,7 +338,7 @@ async function handleRevealSeeds(): Promise<void> {
 
 async function handleVerify(): Promise<void> {
   ($('btn-verify') as HTMLButtonElement).disabled = true;
-  showProcessing('Verifying commitments\u2026');
+  showProcessing(t('processing.verify'));
 
   try {
     const result = await ceremony.verifyAndCombine();
@@ -288,7 +365,7 @@ async function handleGenerate(): Promise<void> {
 
   show('output-phase');
   show('draw-bar');
-  ($('btn-generate') as HTMLButtonElement).textContent = 'Generated';
+  ($('btn-generate') as HTMLButtonElement).textContent = t('btn.generated');
 }
 
 async function handleDrawNext(): Promise<void> {
@@ -306,9 +383,9 @@ async function performDraw(): Promise<void> {
     const entry = document.createElement('div');
     entry.className = 'rejection-entry';
     entry.innerHTML = `
-      <span class="rejection-label">Discarded</span>
+      <span class="rejection-label">${t('draw.discarded')}</span>
       <span class="rejection-value">${rejected.toString()}</span>
-      <span class="info-icon" title="This value was discarded because using it would slightly favor some numbers over others. A new value is drawn to ensure every number in the range has exactly equal probability.">&#9432;</span>
+      <span class="info-icon" title="${t('info.rejection')}">&#9432;</span>
     `;
     area.appendChild(entry);
   }
@@ -316,7 +393,7 @@ async function performDraw(): Promise<void> {
   const card = document.createElement('div');
   card.className = 'result-card';
   card.innerHTML = `
-    <div class="result-meta">Draw #${state.draws.length} &mdash; ${new Date().toLocaleTimeString()}</div>
+    <div class="result-meta">${t('draw.meta', { n: String(state.draws.length), time: new Date().toLocaleTimeString() })}</div>
     <div class="result-number">${result.value}</div>
   `;
   area.appendChild(card);
@@ -336,10 +413,91 @@ function handleExportLog(): void {
   URL.revokeObjectURL(url);
 }
 
+function handleImportLog(): void {
+  ($('import-log-file') as HTMLInputElement).click();
+}
+
+async function handleImportLogFile(event: Event): Promise<void> {
+  const file = (event.target as HTMLInputElement).files?.[0];
+  if (!file) return;
+
+  try {
+    const text = await file.text();
+    const entries: LogEntry[] = JSON.parse(text);
+    if (!Array.isArray(entries) || entries.length === 0) {
+      throw new Error(t('import.invalid_log'));
+    }
+
+    const { verifyLogChain } = await import('./log');
+    const badIdx = await verifyLogChain(entries);
+    if (badIdx >= 0) {
+      const proceed = confirm(t('import.chain_failed', { idx: String(badIdx) }));
+      if (!proceed) return;
+    }
+
+    let localSeed = '', remoteSeed = '', humanInput = '';
+    let localSalt = '', localIter = 600000;
+    let remoteSalt = '', remoteIter = 600000;
+    let humanSalt = '', humanIter = 600000;
+    let min = 1, max = 100, drawCount = 0;
+
+    for (const entry of entries) {
+      const p = entry.payload;
+      switch (entry.event_type) {
+        case 'LOCAL_SEED_COMMITTED':
+          localSalt = (p.salt as string) || '';
+          localIter = (p.iterations as number) || 600000;
+          break;
+        case 'REMOTE_SEED_COMMITTED':
+          remoteSalt = (p.salt as string) || '';
+          remoteIter = (p.iterations as number) || 600000;
+          break;
+        case 'HUMAN_INPUT_RECEIVED':
+          humanSalt = (p.salt as string) || '';
+          humanIter = (p.iterations as number) || 600000;
+          break;
+        case 'SEEDS_REVEALED':
+          localSeed = (p.local_seed as string) || '';
+          remoteSeed = (p.remote_seed as string) || '';
+          humanInput = (p.human_input as string) || '';
+          break;
+        case 'PARAMETERS_LOCKED':
+          min = (p.min as number) ?? 1;
+          max = (p.max as number) ?? 100;
+          break;
+        case 'NUMBER_GENERATED':
+          drawCount++;
+          break;
+      }
+    }
+
+    ($('replay-local-seed') as HTMLInputElement).value = localSeed;
+    ($('replay-local-salt') as HTMLInputElement).value = localSalt;
+    ($('replay-local-iter') as HTMLInputElement).value = String(localIter);
+    ($('replay-remote-seed') as HTMLInputElement).value = remoteSeed;
+    ($('replay-remote-salt') as HTMLInputElement).value = remoteSalt;
+    ($('replay-remote-iter') as HTMLInputElement).value = String(remoteIter);
+    ($('replay-human-input') as HTMLInputElement).value = humanInput;
+    ($('replay-human-salt') as HTMLInputElement).value = humanSalt;
+    ($('replay-human-iter') as HTMLInputElement).value = String(humanIter);
+    ($('replay-min') as HTMLInputElement).value = String(min);
+    ($('replay-max') as HTMLInputElement).value = String(max);
+    ($('replay-draw-count') as HTMLInputElement).value = String(drawCount || 1);
+
+    show('replay-panel');
+    hide('live-panel');
+    setText('btn-replay-mode', t('toolbar.live'));
+  } catch (e) {
+    alert(`${t('import.failed')} ${(e as Error).message}`);
+  }
+
+  (event.target as HTMLInputElement).value = '';
+}
+
 async function handleSelfDownload(): Promise<void> {
   const btn = $('btn-self-download') as HTMLButtonElement;
   btn.disabled = true;
-  btn.textContent = 'Downloading…';
+  btn.textContent = t('download.downloading');
 
   try {
     const response = await fetch(__DISTRIBUTION_URL__);
@@ -352,27 +510,27 @@ async function handleSelfDownload(): Promise<void> {
     a.click();
     URL.revokeObjectURL(url);
     btn.disabled = false;
-    btn.textContent = 'Download HTML';
+    btn.textContent = t('toolbar.download');
   } catch {
-    btn.textContent = 'Unavailable (offline)';
-    btn.title = 'Could not fetch from distribution URL.';
+    btn.textContent = t('download.unavailable');
   }
 }
 
 function handleTogglePresentation(): void {
   presentationMode = !presentationMode;
   document.body.classList.toggle('presentation-mode', presentationMode);
-  setText('btn-presentation', presentationMode ? 'Exit Presentation' : 'Presentation');
+  const btn = $('btn-presentation');
+  btn.classList.toggle('active', presentationMode);
+  setText('btn-presentation', presentationMode ? t('toolbar.exit_presentation') : t('toolbar.presentation'));
 }
 
 function handleToggleLog(): void {
-  const drawer = $('log-drawer');
-  const open = drawer.classList.toggle('open');
-  setText('btn-log-toggle', open ? 'Log ▼' : 'Log ▲');
+  openLogWindow();
+  $('btn-log-toggle').classList.add('active');
 }
 
 function handleReset(): void {
-  if (!confirm('Reset the ceremony? All current data will be lost.')) return;
+  if (!confirm(t('confirm.reset'))) return;
   ceremony.reset();
   location.reload();
 }
@@ -383,11 +541,11 @@ function handleToggleReplay(): void {
   if (showing) {
     hide('replay-panel');
     show('live-panel');
-    setText('btn-replay-mode', 'Replay');
+    setText('btn-replay-mode', t('toolbar.replay'));
   } else {
     show('replay-panel');
     hide('live-panel');
-    setText('btn-replay-mode', 'Live');
+    setText('btn-replay-mode', t('toolbar.live'));
   }
 }
 
@@ -410,7 +568,7 @@ async function handleReplay(): Promise<void> {
   const { replayCeremony } = await import('./ceremony');
 
   try {
-    showProcessing('Replaying ceremony\u2026');
+    showProcessing(t('processing.replay'));
     const result = await replayCeremony(
       localSeedHex, remoteSeedHex, humanInput, min, max, drawCount,
       hexDecode(localSaltHex), localIter,
@@ -418,13 +576,24 @@ async function handleReplay(): Promise<void> {
       hexDecode(humanSaltHex), humanIter,
     );
 
+    const { hexEncode: hex } = await import('./crypto');
+    const c = result.commitments;
+
+    const renderReplayQR = (containerId: string, pbkdf2: Uint8Array, salt: Uint8Array, iter: number) => {
+      const qrData = JSON.stringify({ pbkdf2: hex(pbkdf2), salt: hex(salt), iter });
+      renderQRCode(qrData, $(containerId));
+    };
+    renderReplayQR('replay-local-qr', c.localPbkdf2, c.localSalt, c.localIterations);
+    renderReplayQR('replay-remote-qr', c.remotePbkdf2, c.remoteSalt, c.remoteIterations);
+    renderReplayQR('replay-human-qr', c.humanPbkdf2, c.humanSalt, c.humanIterations);
+
     const output = $('replay-results');
     output.innerHTML = '';
     result.draws.forEach((draw, i) => {
       const div = document.createElement('div');
       div.className = 'replay-result-item';
-      div.textContent = `Draw #${i + 1}: ${draw.value}` +
-        (draw.rejections.length > 0 ? ` (${draw.rejections.length} rejections)` : '');
+      div.textContent = t('replay.draw_result', { n: String(i + 1), value: String(draw.value) }) +
+        (draw.rejections.length > 0 ? ` ${t('replay.rejections', { count: String(draw.rejections.length) })}` : '');
       output.appendChild(div);
     });
     show('replay-results');
@@ -436,16 +605,29 @@ async function handleReplay(): Promise<void> {
   }
 }
 
+function handleLangToggle(): void {
+  const next = getLocale() === 'bg' ? 'en' : 'bg';
+  setLocale(next);
+  updateLangButton();
+  if (presentationMode) {
+    setText('btn-presentation', t('toolbar.exit_presentation'));
+  }
+}
+
+function updateLangButton(): void {
+  const btn = $('btn-lang');
+  btn.textContent = getLocale() === 'bg' ? 'EN' : 'BG';
+}
+
 // ——— Crypto check ———
 
 function checkCryptoAvailability(): boolean {
   if (!crypto?.subtle) {
     $('app').innerHTML = `
       <div class="fatal-error">
-        <h1>Web Crypto API Unavailable</h1>
-        <p>This application requires <code>crypto.subtle</code>, which is only available in secure contexts.</p>
-        <p>Please open this file in a browser that supports the Web Crypto API.
-           If using Tor Browser, ensure you are running a recent version based on Firefox ESR.</p>
+        <h1>${t('error.crypto_title')}</h1>
+        <p>${t('error.crypto_body')}</p>
+        <p>${t('error.crypto_help')}</p>
       </div>
     `;
     return false;
@@ -456,9 +638,15 @@ function checkCryptoAvailability(): boolean {
 // ——— Init ———
 
 export function initUI(): void {
+  initI18n();
+  updateLangButton();
+
   if (!checkCryptoAvailability()) return;
 
   ceremony.onLogEntry(appendLogEntry);
+
+  // Language toggle
+  $('btn-lang').addEventListener('click', handleLangToggle);
 
   // Source card actions
   $('btn-generate-local').addEventListener('click', handleGenerateLocal);
@@ -478,6 +666,8 @@ export function initUI(): void {
 
   // Toolbar
   $('btn-export-log').addEventListener('click', handleExportLog);
+  $('btn-import-log').addEventListener('click', handleImportLog);
+  $('import-log-file').addEventListener('change', handleImportLogFile);
   $('btn-self-download').addEventListener('click', handleSelfDownload);
   $('btn-presentation').addEventListener('click', handleTogglePresentation);
   $('btn-reset').addEventListener('click', handleReset);
