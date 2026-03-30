@@ -130,6 +130,60 @@ function updateChainQR(chainHash: string): void {
   }
 }
 
+// ——— Documentation (child window) ———
+
+let docWindow: Window | null = null;
+
+const DOC_SECTIONS = [
+  'overview', 'commitment', 'sources', 'xor', 'rejection', 'csrng', 'log', 'qr', 'verify',
+] as const;
+
+function getDocWindowHTML(): string {
+  const sections = DOC_SECTIONS.map(id => `
+    <section id="${id}">
+      <h2>${t(`doc.${id}_title`)}</h2>
+      <p>${t(`doc.${id}`)}</p>
+    </section>`).join('\n');
+
+  return `<!DOCTYPE html>
+<html lang="${document.documentElement.lang}">
+<head><meta charset="UTF-8"><title>${t('doc.title')}</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;background:#0d1117;color:#e6edf3;font-size:15px;line-height:1.7;padding:2rem 2.5rem;max-width:720px;margin:0 auto}
+h1{font-size:1.3rem;margin-bottom:2rem;color:#58a6ff;border-bottom:1px solid #30363d;padding-bottom:0.75rem}
+h2{font-size:1rem;margin:1.5rem 0 0.5rem;color:#58a6ff}
+section{border-bottom:1px solid #30363d;padding-bottom:1rem;margin-bottom:0.5rem}
+section:last-child{border-bottom:none}
+p{color:#c9d1d9}
+strong{color:#e6edf3}
+code{background:#161b22;padding:0.15rem 0.4rem;border-radius:3px;font-family:'SF Mono','Cascadia Code',monospace;font-size:0.9em}
+:target{background:#1f3a5f;border-radius:6px;padding:0.5rem;margin:-0.5rem}
+</style></head>
+<body>
+<h1>${t('doc.title')}</h1>
+${sections}
+</body></html>`;
+}
+
+function openDocWindow(scrollTo?: string): void {
+  if (docWindow && !docWindow.closed) {
+    if (scrollTo) {
+      docWindow.location.hash = scrollTo;
+    }
+    docWindow.focus();
+    return;
+  }
+  docWindow = window.open('', 'lottery-doc', 'width=640,height=700,scrollbars=yes,resizable=yes');
+  if (!docWindow) return;
+  docWindow.document.open();
+  docWindow.document.write(getDocWindowHTML());
+  docWindow.document.close();
+  if (scrollTo) {
+    docWindow.location.hash = scrollTo;
+  }
+}
+
 // ——— Button state management ———
 
 function syncButtons(): void {
@@ -148,7 +202,7 @@ function syncButtons(): void {
 // ——— Commitment rendering ———
 
 function renderCommitment(
-  qrContainerId: string,
+  stripQrId: string,
   valueId: string,
   pbkdf2Hex: string,
   saltHex: string,
@@ -158,24 +212,13 @@ function renderCommitment(
   setText(valueId, asterisks);
 
   const qrData = JSON.stringify({ pbkdf2: pbkdf2Hex, salt: saltHex, iter: iterations });
-  const qrContainer = $(qrContainerId);
+  const stripContainer = $(stripQrId);
   if (presentationMode) {
-    renderQRCodeLarge(qrData, qrContainer);
+    renderQRCodeLarge(qrData, stripContainer);
   } else {
-    renderQRCode(qrData, qrContainer);
+    renderQRCode(qrData, stripContainer);
   }
-}
-
-function syncStripQR(sourceQrId: string, stripId: string): void {
-  const source = $(sourceQrId);
-  const strip = $(stripId);
-  const img = source.querySelector('.qr-code') as HTMLImageElement | null;
-  if (img) {
-    strip.innerHTML = '';
-    const clone = img.cloneNode(true) as HTMLImageElement;
-    strip.appendChild(clone);
-    $('qr-strip').classList.remove('hidden');
-  }
+  $('qr-strip').classList.remove('hidden');
 }
 
 function renderRevealed(valueId: string, seedHex: string): void {
@@ -202,9 +245,8 @@ async function handleGenerateLocal(): Promise<void> {
 
   try {
     const c = await ceremony.generateLocalSeed();
-    renderCommitment('local-qr', 'local-value',
+    renderCommitment('strip-local-qr', 'local-value',
       hexEncode(c.pbkdf2Output), hexEncode(c.salt), c.iterations);
-    syncStripQR('local-qr', 'strip-local-qr');
     setLockIcon('local-lock', 'closed');
     setCardState('card-local', 'committed');
     hide('local-action');
@@ -225,9 +267,8 @@ async function handleFetchRemote(): Promise<void> {
     const result = await fetchRandomOrg();
     showProcessing(t('processing.commitment'));
     const c = await ceremony.setRemoteSeed(result.seedHex);
-    renderCommitment('remote-qr', 'remote-value',
+    renderCommitment('strip-remote-qr', 'remote-value',
       hexEncode(c.pbkdf2Output), hexEncode(c.salt), c.iterations);
-    syncStripQR('remote-qr', 'strip-remote-qr');
     setLockIcon('remote-lock', 'closed');
     setCardState('card-remote', 'committed');
     hide('remote-action');
@@ -256,9 +297,8 @@ async function handleManualSubmit(): Promise<void> {
     showProcessing(t('processing.commitment'));
 
     const c = await ceremony.setRemoteSeed(result.seedHex);
-    renderCommitment('remote-qr', 'remote-value',
+    renderCommitment('strip-remote-qr', 'remote-value',
       hexEncode(c.pbkdf2Output), hexEncode(c.salt), c.iterations);
-    syncStripQR('remote-qr', 'strip-remote-qr');
     setLockIcon('remote-lock', 'closed');
     setCardState('card-remote', 'committed');
     hide('remote-action');
@@ -286,9 +326,8 @@ async function handleHumanInput(): Promise<void> {
 
   try {
     const c = await ceremony.receiveHumanInput(input);
-    renderCommitment('human-qr', 'human-value',
+    renderCommitment('strip-human-qr', 'human-value',
       hexEncode(c.pbkdf2Output), hexEncode(c.salt), c.iterations);
-    syncStripQR('human-qr', 'strip-human-qr');
     setLockIcon('human-lock', 'closed');
     setCardState('card-human', 'committed');
     hide('human-action');
@@ -385,7 +424,7 @@ async function performDraw(): Promise<void> {
     entry.innerHTML = `
       <span class="rejection-label">${t('draw.discarded')}</span>
       <span class="rejection-value">${rejected.toString()}</span>
-      <span class="info-icon" title="${t('info.rejection')}">&#9432;</span>
+      <span class="info-icon" data-doc="rejection" style="cursor:pointer">&#9432;</span>
     `;
     area.appendChild(entry);
   }
@@ -644,6 +683,13 @@ export function initUI(): void {
   if (!checkCryptoAvailability()) return;
 
   ceremony.onLogEntry(appendLogEntry);
+
+  // Help / documentation
+  $('btn-help').addEventListener('click', () => openDocWindow());
+  document.addEventListener('click', (e) => {
+    const target = (e.target as HTMLElement).closest('[data-doc]');
+    if (target) openDocWindow(target.getAttribute('data-doc')!);
+  });
 
   // Language toggle
   $('btn-lang').addEventListener('click', handleLangToggle);

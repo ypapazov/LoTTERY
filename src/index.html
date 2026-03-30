@@ -12,6 +12,7 @@
     <header class="toolbar">
       <h1>LoTTERY</h1>
       <div class="toolbar-actions">
+        <button id="btn-help" data-i18n="toolbar.help">Помощ</button>
         <button id="btn-lang" class="lang-btn" title="EN / BG">EN</button>
         <button id="btn-replay-mode" data-i18n="toolbar.replay">Повторение</button>
         <button id="btn-presentation" data-i18n="toolbar.presentation">Презентация</button>
@@ -23,11 +24,20 @@
       </div>
     </header>
 
-    <!-- Sticky QR strip (visible when source cards scroll out of view) -->
+    <!-- QR commitment strip (sticky, shows above source cards) -->
     <div class="qr-strip hidden" id="qr-strip">
-      <div class="qr-strip-item" id="strip-local-qr"></div>
-      <div class="qr-strip-item" id="strip-remote-qr"></div>
-      <div class="qr-strip-item" id="strip-human-qr"></div>
+      <div class="qr-strip-item">
+        <div class="qr-strip-label" data-i18n="card.local.label">Локален CSRNG</div>
+        <div id="strip-local-qr"></div>
+      </div>
+      <div class="qr-strip-item">
+        <div class="qr-strip-label" data-i18n="card.remote.label">random.org</div>
+        <div id="strip-remote-qr"></div>
+      </div>
+      <div class="qr-strip-item">
+        <div class="qr-strip-label" data-i18n="card.human.label">Човешки вход</div>
+        <div id="strip-human-qr"></div>
+      </div>
     </div>
 
     <!-- Live Ceremony -->
@@ -41,18 +51,16 @@
 
           <!-- Card 1: Local CSRNG -->
           <div class="source-card" id="card-local" data-state="empty">
-            <div class="source-qr-wrap">
-              <div class="source-qr" id="local-qr"></div>
-              <span class="info-icon" data-i18n-title="info.commitment" title="Това е криптографско заключване. То доказва, че този seed е бил избран преди другите входове да бъдат получени, без да разкрива самия seed.">&#9432;</span>
+            <div class="card-connector"></div>
+            <div class="source-label">
+              <svg viewBox="0 0 24 24" width="16" height="16"><use href="#icon-chip"/></svg>
+              <span data-i18n="card.local.label">Локален CSRNG</span>
+              <span class="info-icon" data-doc="commitment">&#9432;</span>
             </div>
             <div class="source-lock" id="local-lock">
               <svg viewBox="0 0 24 24" width="28" height="28"><use href="#icon-lock-closed"/></svg>
             </div>
             <div class="source-value mono" id="local-value">—</div>
-            <div class="source-label">
-              <svg viewBox="0 0 24 24" width="16" height="16"><use href="#icon-chip"/></svg>
-              <span data-i18n="card.local.label">Локален CSRNG</span>
-            </div>
             <div class="source-action" id="local-action">
               <button id="btn-generate-local" class="primary" data-i18n="card.local.generate">Генерирай</button>
             </div>
@@ -60,18 +68,16 @@
 
           <!-- Card 2: random.org -->
           <div class="source-card" id="card-remote" data-state="empty">
-            <div class="source-qr-wrap">
-              <div class="source-qr" id="remote-qr"></div>
-              <span class="info-icon" data-i18n-title="info.commitment" title="Това е криптографско заключване. То доказва, че този seed е бил избран преди другите входове да бъдат получени, без да разкрива самия seed.">&#9432;</span>
+            <div class="card-connector"></div>
+            <div class="source-label">
+              <svg viewBox="0 0 24 24" width="16" height="16"><use href="#icon-cloud"/></svg>
+              <span data-i18n="card.remote.label">random.org</span>
+              <span class="info-icon" data-doc="commitment">&#9432;</span>
             </div>
             <div class="source-lock" id="remote-lock">
               <svg viewBox="0 0 24 24" width="28" height="28"><use href="#icon-lock-closed"/></svg>
             </div>
             <div class="source-value mono" id="remote-value">—</div>
-            <div class="source-label">
-              <svg viewBox="0 0 24 24" width="16" height="16"><use href="#icon-cloud"/></svg>
-              <span data-i18n="card.remote.label">random.org</span>
-            </div>
             <div class="source-action" id="remote-action">
               <button id="btn-fetch-remote" class="primary" data-i18n="card.remote.fetch">Извличане</button>
               <button id="btn-manual-remote" data-i18n="card.remote.manual">Ръчно</button>
@@ -85,18 +91,16 @@
 
           <!-- Card 3: Human Input -->
           <div class="source-card" id="card-human" data-state="empty">
-            <div class="source-qr-wrap">
-              <div class="source-qr" id="human-qr"></div>
-              <span class="info-icon" data-i18n-title="info.human_commitment" title="Казаният вход се обработва чрез PBKDF2, за да се получи този commitment.">&#9432;</span>
+            <div class="card-connector"></div>
+            <div class="source-label">
+              <svg viewBox="0 0 24 24" width="16" height="16"><use href="#icon-person"/></svg>
+              <span data-i18n="card.human.label">Човешки вход</span>
+              <span class="info-icon" data-doc="commitment">&#9432;</span>
             </div>
             <div class="source-lock" id="human-lock">
               <svg viewBox="0 0 24 24" width="28" height="28"><use href="#icon-lock-closed"/></svg>
             </div>
             <div class="source-value mono" id="human-value">—</div>
-            <div class="source-label">
-              <svg viewBox="0 0 24 24" width="16" height="16"><use href="#icon-person"/></svg>
-              <span data-i18n="card.human.label">Човешки вход</span>
-            </div>
             <div class="source-action" id="human-action">
               <input type="text" id="human-input-value" data-i18n-placeholder="card.human.placeholder" placeholder="Казано число…">
               <button id="btn-submit-human" class="primary" data-i18n="card.human.submit">Изпрати</button>
@@ -106,6 +110,7 @@
         </div>
 
         <!-- XOR Diagram -->
+        <!-- Credit to https://commons.wikimedia.org/wiki/File:XOR_ANSI.svg; Public domain -->
         <div class="xor-diagram" id="xor-diagram">
           <svg viewBox="0 0 600 340" preserveAspectRatio="xMidYMid meet">
             <defs>

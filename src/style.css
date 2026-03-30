@@ -83,28 +83,40 @@ button.primary { background: var(--accent-dim); border-color: var(--accent); col
 button.primary:hover:not(:disabled) { background: #1a4a7a; }
 button.danger { border-color: var(--red); color: var(--red); }
 
-/* ===== QR Sticky Strip ===== */
+/* ===== QR Commitment Strip ===== */
 .qr-strip {
   position: sticky;
   top: var(--toolbar-h);
   z-index: 90;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
-  display: flex;
-  justify-content: center;
-  gap: 1.5rem;
-  padding: 0.4rem 1rem;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  padding: 0.75rem 2rem;
+  max-width: 1100px;
+  margin: 0 auto;
 }
 .qr-strip-item {
   text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
 }
-.qr-strip-item:empty { display: none; }
+.qr-strip-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
 .qr-strip-item .qr-code {
   image-rendering: pixelated;
-  max-height: 64px;
+  max-width: 100%;
   background: #fff;
-  padding: 2px;
-  border-radius: 3px;
+  padding: 4px;
+  border-radius: 4px;
 }
 
 /* ===== Main ===== */
@@ -145,32 +157,24 @@ main { padding: 1.5rem 2rem; max-width: 1100px; margin: 0 auto; }
 .source-card[data-state="revealed"] { opacity: 1; border-color: var(--green); }
 .source-card[data-state="failed"] { opacity: 1; border-color: var(--red); }
 
-/* QR wrap (sticky on scroll) */
-.source-qr-wrap {
-  position: sticky;
-  top: calc(var(--toolbar-h) + 8px);
-  z-index: 10;
-  background: var(--surface);
-  padding: 0.5rem;
-  border-radius: 8px;
-  text-align: center;
-  min-height: 40px;
+/* Connector line from QR strip to card */
+.card-connector {
+  width: 2px;
+  height: 24px;
+  background: var(--border);
+  margin: -1rem auto 0;
+  transition: background 0.3s;
 }
+.source-card[data-state="committed"] .card-connector,
+.source-card[data-state="revealed"] .card-connector { background: var(--accent); }
 
-.source-qr-wrap .info-icon {
-  display: block;
+.info-icon {
   font-size: 0.8rem;
   color: var(--text-muted);
-  cursor: help;
-  margin-top: 0.25rem;
+  cursor: pointer;
 }
-
-.source-qr .qr-code {
-  image-rendering: pixelated;
-  max-width: 100%;
-  background: #fff;
-  padding: 4px;
-  border-radius: 4px;
+.info-icon:hover {
+  color: var(--accent);
 }
 
 /* Lock indicator */
@@ -364,8 +368,7 @@ main { padding: 1.5rem 2rem; max-width: 1100px; margin: 0 auto; }
 }
 
 .rejection-entry .info-icon {
-  cursor: help;
-  color: var(--text-muted);
+  cursor: pointer;
 }
 
 /* ===== Sticky Draw Bar ===== */
@@ -516,10 +519,10 @@ input:focus { outline: none; border-color: var(--accent); }
 
 /* ===== Presentation Mode ===== */
 body.presentation-mode .toolbar-actions button:not(#btn-presentation):not(#btn-reset) { display: none; }
-body.presentation-mode .log-drawer { display: none; }
+body.presentation-mode .log-bar { display: none; }
 
 body.presentation-mode .result-card .result-number { font-size: 8rem; }
-body.presentation-mode .source-qr .qr-code { max-width: 280px; }
+body.presentation-mode .qr-strip-item .qr-code { max-width: 280px; }
 body.presentation-mode .source-value { font-size: 0.85rem; }
 body.presentation-mode .draw-btn { font-size: 1.3rem; padding: 1rem 4rem; }
 

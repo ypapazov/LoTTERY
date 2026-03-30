@@ -11,6 +11,55 @@ function computeQrLibraryHash(): string {
   return createHash('sha256').update(content).digest('hex');
 }
 
+function sha256Base64(content: string): string {
+  return createHash('sha256').update(content, 'utf-8').digest('base64');
+}
+
+/**
+ * Extract all inline <script> and <style> blocks from HTML,
+ * compute their SHA-256 hashes, and inject a Content-Security-Policy
+ * <meta> tag that allowlists exactly those hashes.
+ */
+function injectCSP(html: string): string {
+  const scriptHashes: string[] = [];
+  const styleHashes: string[] = [];
+
+  const scriptRe = /<script[^>]*>([\s\S]*?)<\/script>/gi;
+  let m;
+  while ((m = scriptRe.exec(html)) !== null) {
+    const content = m[1];
+    if (content.trim()) {
+      scriptHashes.push(`'sha256-${sha256Base64(content)}'`);
+    }
+  }
+
+  const styleRe = /<style[^>]*>([\s\S]*?)<\/style>/gi;
+  while ((m = styleRe.exec(html)) !== null) {
+    const content = m[1];
+    if (content.trim()) {
+      styleHashes.push(`'sha256-${sha256Base64(content)}'`);
+    }
+  }
+
+  const directives = [
+    `default-src 'none'`,
+    `script-src ${scriptHashes.join(' ')}`,
+    `style-src ${styleHashes.join(' ')}`,
+    `img-src data: blob:`,
+    `connect-src ${buildConfig.DISTRIBUTION_URL} https://www.random.org`,
+    `form-action 'none'`,
+    `base-uri 'none'`,
+  ];
+
+  const cspMeta = `<meta http-equiv="Content-Security-Policy" content="${directives.join('; ')}">`;
+  const referrerMeta = `<meta name="referrer" content="no-referrer">`;
+
+  return html.replace(
+    '<meta charset="UTF-8">',
+    `<meta charset="UTF-8">\n  ${cspMeta}\n  ${referrerMeta}`,
+  );
+}
+
 const qrHash = computeQrLibraryHash();
 const qrPkg = JSON.parse(
   readFileSync(resolve(__dirname, 'node_modules/qrcode-generator/package.json'), 'utf-8'),
@@ -40,9 +89,18 @@ export default defineConfig({
       },
     },
     {
-      name: 'generate-sha256sums',
+      name: 'inject-csp-and-checksums',
       closeBundle() {
         const distDir = resolve(__dirname, 'dist');
+        const htmlPath = join(distDir, 'index.html');
+
+        // 1. Inject CSP meta tag with SHA-256 hashes of all inline scripts/styles
+        let html = readFileSync(htmlPath, 'utf-8');
+        html = injectCSP(html);
+        writeFileSync(htmlPath, html);
+        console.log('\nCSP meta tag injected with script/style hashes.');
+
+        // 2. Generate SHA256SUMS (after CSP injection so hash reflects final file)
         const lines: string[] = [];
         for (const file of readdirSync(distDir)) {
           const fullPath = join(distDir, file);
@@ -52,7 +110,7 @@ export default defineConfig({
         }
         const content = lines.join('\n') + '\n';
         writeFileSync(join(distDir, 'SHA256SUMS'), content);
-        console.log(`\nSHA256SUMS generated:\n${content}`);
+        console.log(`SHA256SUMS generated:\n${content}`);
       },
     },
   ],
