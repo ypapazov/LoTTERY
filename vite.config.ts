@@ -131,11 +131,13 @@ export default defineConfig({
           `     SHA-256 of qrcode.js: ${qrHashHex}`,
           `     This script is the UNMODIFIED qrcode.js from the npm package. -->`,
         ].join('\n  ');
-        const qrScriptTag = `${qrComment}\n  <script integrity="sha256-${qrHashB64}">\n${qrSource}</script>`;
-        html = html.replace(
-          /<script type="module"/,
-          `${qrScriptTag}\n  <script type="module"`,
-        );
+        const qrScriptTag = `${qrComment}\n  <script integrity="sha256-${qrHashB64}">${qrSource}</script>`;
+
+        // Find the HTML-level <script type="module"> — search backward from the end of the
+        // file to skip any occurrences inside JS string literals in the bundled code.
+        const tagIdx = html.lastIndexOf('<script type="module"');
+        if (tagIdx < 0) throw new Error('Could not find app module <script> tag in HTML');
+        html = html.slice(0, tagIdx) + qrScriptTag + '\n  ' + html.slice(tagIdx);
 
         // 2. Inject CSP (picks up both scripts + all styles)
         html = injectCSP(html);

@@ -38,7 +38,33 @@ function hideProcessing(): void {
 let logWindow: Window | null = null;
 const pendingLogEntries: LogEntry[] = [];
 
+const LOG_WINDOW_SCRIPT = [
+  "window.addEventListener('message',function(e){",
+  "  if(e.data&&e.data.type==='log-entry'){",
+  "    var d=e.data.entry;",
+  "    var el=document.createElement('div');el.className='entry';",
+  "    var h=document.createElement('div');h.className='entry-header';",
+  "    h.textContent='#'+d.sequence+' ['+d.timestamp+'] '+d.event_type;",
+  "    el.appendChild(h);",
+  "    var p=document.createElement('pre');p.className='entry-payload';",
+  "    p.textContent=JSON.stringify(d.payload,null,2);",
+  "    el.appendChild(p);",
+  "    var c=document.createElement('div');c.className='entry-hash';",
+  "    c.textContent='Chain: '+d.chain_hash;",
+  "    el.appendChild(c);",
+  "    document.getElementById('entries').appendChild(el);",
+  "    el.scrollIntoView({behavior:'smooth'});",
+  "  }",
+  "  if(e.data&&e.data.type==='chain-qr'){",
+  "    document.getElementById('chain-qr').innerHTML=e.data.html;",
+  "  }",
+  "});",
+  "window.opener&&window.opener.postMessage({type:'log-ready'},'*');",
+].join('\n');
+
 function getLogWindowHTML(): string {
+  const S = `<${['script'].join('')}>`;
+  const SE = `</${['script'].join('')}>`;
   return `<!DOCTYPE html>
 <html lang="${document.documentElement.lang}">
 <head><meta charset="UTF-8"><title>LoTTERY — Log</title>
@@ -54,29 +80,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,san
 .entry-hash{font-family:'SF Mono','Cascadia Code','Fira Code',monospace;font-size:0.6rem;color:#8b949e;word-break:break-all}
 </style></head>
 <body><div id="chain-qr"></div><div id="entries"></div>
-<script>
-window.addEventListener('message',function(e){
-  if(e.data&&e.data.type==='log-entry'){
-    var d=e.data.entry;
-    var el=document.createElement('div');el.className='entry';
-    var h=document.createElement('div');h.className='entry-header';
-    h.textContent='#'+d.sequence+' ['+d.timestamp+'] '+d.event_type;
-    el.appendChild(h);
-    var p=document.createElement('pre');p.className='entry-payload';
-    p.textContent=JSON.stringify(d.payload,null,2);
-    el.appendChild(p);
-    var c=document.createElement('div');c.className='entry-hash';
-    c.textContent='Chain: '+d.chain_hash;
-    el.appendChild(c);
-    document.getElementById('entries').appendChild(el);
-    el.scrollIntoView({behavior:'smooth'});
-  }
-  if(e.data&&e.data.type==='chain-qr'){
-    document.getElementById('chain-qr').innerHTML=e.data.html;
-  }
-});
-window.opener&&window.opener.postMessage({type:'log-ready'},'*');
-</script></body></html>`;
+${S}
+${LOG_WINDOW_SCRIPT}
+${SE}</body></html>`;
 }
 
 function openLogWindow(): void {

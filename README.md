@@ -22,6 +22,7 @@ The entire ceremony log is hash-chained and exportable. Anyone can import a log 
 npm install
 npm test          # run unit tests
 npm run build     # produces dist/index.html + dist/SHA256SUMS
+npm run validate  # audit dist/index.html (hashes, CSP, SRI, AST)
 ```
 
 The output is a single self-contained HTML file. Open it directly in a browser — no server required.
