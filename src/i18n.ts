@@ -74,8 +74,6 @@ const strings: Record<Locale, Record<string, string>> = {
     'error.use_manual': 'Използвайте ръчно въвеждане.',
 
     'confirm.reset': 'Нулиране на церемонията? Всички текущи данни ще бъдат загубени.',
-    'download.downloading': 'Изтегляне…',
-    'download.unavailable': 'Недостъпно (офлайн)',
 
     'draw.discarded': 'Отхвърлено',
     'draw.duplicate': 'Дубликат — ново теглене',
@@ -108,6 +106,7 @@ const strings: Record<Locale, Record<string, string>> = {
     'doc.verify': '1. Сканирайте QR кодовете по време на церемонията — те съдържат commitment данните.<br>2. Когато seed-овете бъдат разкрити, приложението ги проверява срещу commitment-ите.<br>3. Експортирайте лога и го импортирайте в друго копие на приложението за независим replay.<br>4. Проверете hash-а на HTML файла срещу SHA256SUMS, подписан от организаторите.<br>5. Прегледайте изходния код — файлът не е минифициран умишлено, за да е четим.',
     'doc.qr_title': 'QR кодове',
     'doc.qr': 'QR кодовете съдържат JSON с полета: pbkdf2 (hex), salt (hex) и iter (число). Могат да бъдат сканирани с всеки QR четец и стойностите да бъдат проверени ръчно или чрез replay функцията.',
+    'doc.project_link': 'Проект и материали за проверка →',
   },
 
   en: {
@@ -178,8 +177,6 @@ const strings: Record<Locale, Record<string, string>> = {
     'error.failed_prefix': 'Failed:',
     'error.use_manual': 'Use manual entry.',
     'confirm.reset': 'Reset the ceremony? All current data will be lost.',
-    'download.downloading': 'Downloading\u2026',
-    'download.unavailable': 'Unavailable (offline)',
 
     'draw.discarded': 'Discarded',
     'draw.duplicate': 'Duplicate \u2014 re-drawing',
@@ -212,6 +209,7 @@ const strings: Record<Locale, Record<string, string>> = {
     'doc.verify': '1. Scan the QR codes during the ceremony — they contain commitment data.<br>2. When seeds are revealed, the application verifies them against the commitments.<br>3. Export the log and import it into another copy of the application for independent replay.<br>4. Check the HTML file hash against SHA256SUMS, signed by the organizers.<br>5. Review the source code — the file is intentionally unminified to be human-readable.',
     'doc.qr_title': 'QR Codes',
     'doc.qr': 'The QR codes contain JSON with fields: pbkdf2 (hex), salt (hex), and iter (number). They can be scanned with any QR reader and the values verified manually or via the replay function.',
+    'doc.project_link': 'Project & verification materials →',
   },
 };
 

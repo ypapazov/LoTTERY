@@ -89,7 +89,7 @@ function injectCSP(html: string): string {
     `script-src ${[...scriptHashes].join(' ')}`,
     `style-src ${[...styleHashes].join(' ')}`,
     `img-src data: blob:`,
-    `connect-src ${buildConfig.DISTRIBUTION_URL} https://www.random.org`,
+    `connect-src https://www.random.org`,
     `form-action 'none'`,
     `base-uri 'none'`,
   ];
@@ -106,7 +106,7 @@ function injectCSP(html: string): string {
 export default defineConfig({
   root: 'src',
   define: {
-    __DISTRIBUTION_URL__: JSON.stringify(buildConfig.DISTRIBUTION_URL),
+    __DOCS_URL__: JSON.stringify(buildConfig.DOCS_URL),
     __QR_LIBRARY_VERSION__: JSON.stringify(qrPkg.version),
     __QR_LIBRARY_INTEGRITY__: JSON.stringify(`sha256-${qrHashHex}`),
   },

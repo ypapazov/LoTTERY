@@ -5,7 +5,7 @@ import { renderQRCode, renderQRCodeLarge } from './qr';
 import type { LogEntry } from './log';
 import { t, getLocale, setLocale, initI18n } from './i18n';
 
-declare const __DISTRIBUTION_URL__: string;
+declare const __DOCS_URL__: string;
 
 const ceremony = new Ceremony();
 let presentationMode = false;
@@ -214,6 +214,9 @@ code{background:#161b22;padding:0.15rem 0.4rem;border-radius:3px;font-family:'SF
 <body>
 <h1>${t('doc.title')}</h1>
 ${sections}
+<footer style="margin-top:2rem;padding-top:1rem;border-top:1px solid #30363d;font-size:0.85rem;color:#8b949e">
+  <a href="${__DOCS_URL__}" target="_blank" rel="noopener" style="color:#58a6ff">${t('doc.project_link')}</a>
+</footer>
 </body></html>`;
 }
 
@@ -618,26 +621,11 @@ async function handleImportLogFile(event: Event): Promise<void> {
   (event.target as HTMLInputElement).value = '';
 }
 
-async function handleSelfDownload(): Promise<void> {
-  const btn = $('btn-self-download') as HTMLButtonElement;
-  btn.disabled = true;
-  btn.textContent = t('download.downloading');
-
-  try {
-    const response = await fetch(__DISTRIBUTION_URL__);
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const blob = await response.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'ceremony.html';
-    a.click();
-    URL.revokeObjectURL(url);
-    btn.disabled = false;
-    btn.textContent = t('toolbar.download');
-  } catch {
-    btn.textContent = t('download.unavailable');
-  }
+function handleSelfDownload(): void {
+  const a = document.createElement('a');
+  a.href = window.location.href;
+  a.download = 'ceremony.html';
+  a.click();
 }
 
 function handleTogglePresentation(): void {
