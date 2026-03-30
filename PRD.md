@@ -63,7 +63,7 @@ A designated person provides a random number. This must be spoken aloud or other
 The JS seed and random.org seed are revealed on screen, replacing the masked values. The audience can now inspect and photograph the raw seed values.
 
 **Step 5 — Verify commitments**
-The application recomputes the PBKDF2 outputs for the revealed seeds and displays verification status against the earlier commitments. On success, the three PBKDF2 outputs are XOR'd to produce the combined seed, and the CSRNG is initialized.
+The application recomputes the PBKDF2 outputs for the revealed seeds and displays verification status against the earlier commitments. On success, the raw local and remote seeds are XOR'd with the human input's deterministic derivation (see §6.2) to produce the combined seed, and the CSRNG is initialized.
 
 **Step 6 — Generate output**
 The first output of the CSRNG is mapped to the [min, max] range using rejection sampling. The result is displayed.
@@ -89,9 +89,10 @@ Each additional number is the next sequential output of the CSRNG seeded in Step
 
 ### 6.2 Entropy Combination
 
-- **Method**: Bitwise XOR of all three PBKDF2 commitment outputs
+- **Method**: Bitwise XOR of the raw local seed, raw remote seed, and a deterministic derivation of the human input
+- **Human input derivation**: `PBKDF2-HMAC-SHA-256(input, SHA-256("LoTTERY" || input), 600000)` — a deterministic, domain-separated derivation that turns the human's string into 32 bytes with a work factor against precomputation
 - **Property**: Output is uniformly random if any one of the three inputs is uniformly random and independent of the others
-- **Input normalization**: All three sources are processed through PBKDF2-HMAC-SHA-256 (per §6.1), producing 32-byte outputs. These PBKDF2 outputs — not the raw seeds — are the values XOR'd together. Simple SHA-256 is not used for normalization due to the predictability of low-entropy inputs (e.g., a human-provided number).
+- **Separation of concerns**: The PBKDF2 commitments (§6.1) are used only for the commit-then-reveal protocol. The XOR inputs (raw seeds for local/remote, PBKDF2 derivation for human) are never published before the reveal phase. This ensures that no participant sees another's XOR input before all three are committed.
 
 ### 6.3 Range Mapping
 
@@ -102,7 +103,7 @@ Each additional number is the next sequential output of the CSRNG seeded in Step
 
 ### 6.4 CSRNG for Sequential Draws
 
-- **Seeded with**: The XOR-combined value from the three PBKDF2 outputs (32 bytes)
+- **Seeded with**: The XOR-combined value from the three entropy sources (32 bytes) — see §6.2
 - **Deterministic**: Given the same seed, produces the same sequence — this is required for replay verification
 - **Implementation**: AES-256-CTR via the Web Crypto API. The 32-byte combined seed is the AES key. The IV (nonce + counter) is initialized to 16 zero bytes. The plaintext is all zero bytes. The keystream (ciphertext) is the CSRNG output. Output is consumed in chunks of `k` bytes per draw (see §6.3).
 

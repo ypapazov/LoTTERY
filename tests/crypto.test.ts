@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   generateRandomBytes, generateSeed, computePBKDF2, createCommitment,
   verifyCommitment, xorBytes, xorThree, sha256, hexEncode, hexDecode,
-  textToBytes, SEED_BYTES,
+  textToBytes, deriveHumanContribution, SEED_BYTES,
 } from '../src/crypto';
 
 describe('generateRandomBytes', () => {
@@ -141,5 +141,24 @@ describe('xorThree', () => {
     const c = new Uint8Array([0x10, 0x20]);
     const result = xorThree(a, b, c);
     expect(Array.from(result)).toEqual([0x15, 0x2a]);
+  });
+});
+
+describe('deriveHumanContribution', () => {
+  it('returns 32 bytes', async () => {
+    const result = await deriveHumanContribution('test input');
+    expect(result.length).toBe(32);
+  });
+
+  it('is deterministic for the same input', async () => {
+    const a = await deriveHumanContribution('hello');
+    const b = await deriveHumanContribution('hello');
+    expect(hexEncode(a)).toBe(hexEncode(b));
+  });
+
+  it('produces different outputs for different inputs', async () => {
+    const a = await deriveHumanContribution('hello');
+    const b = await deriveHumanContribution('world');
+    expect(hexEncode(a)).not.toBe(hexEncode(b));
   });
 });

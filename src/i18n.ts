@@ -29,6 +29,7 @@ const strings: Record<Locale, Record<string, string>> = {
 
     'range.min': 'Мин',
     'range.max': 'Макс',
+    'range.unique': 'Без повторения',
     'range.lock_title': 'Заключване на диапазон',
     'range.draws': 'Тегления',
 
@@ -77,9 +78,11 @@ const strings: Record<Locale, Record<string, string>> = {
     'download.unavailable': 'Недостъпно (офлайн)',
 
     'draw.discarded': 'Отхвърлено',
+    'draw.duplicate': 'Дубликат — ново теглене',
     'draw.meta': 'Теглене #{n} — {time}',
     'replay.draw_result': 'Теглене #{n}: {value}',
     'replay.rejections': '({count} отхвърляния)',
+    'replay.duplicate_rejections': '({count} дубликата)',
 
     'import.invalid_log': 'Невалиден лог: очаква се непразен масив от записи',
     'import.chain_failed': 'Верификацията на log chain е неуспешна на запис #{idx}. Продължаване?',
@@ -92,11 +95,11 @@ const strings: Record<Locale, Record<string, string>> = {
     'doc.commitment_title': 'Какво е Commitment (заключване)?',
     'doc.commitment': 'Commitment (заключване) е криптографски "ангажимент" към дадена стойност, без тя да бъде разкрита. Ние използваме PBKDF2-HMAC-SHA-256 с 600 000 итерации и произволен salt. QR кодът съдържа резултата от PBKDF2, salt-а и броя итерации. Така всеки може по-късно да провери, че разкритият seed наистина съответства на дадения commitment — но преди разкриването е невъзможно да се отгатне seed-ът.',
     'doc.sources_title': 'Три източника на ентропия',
-    'doc.sources': '<strong>Локален CSRNG:</strong> 32 байта от crypto.getRandomValues() — вграденият в браузъра хардуерен генератор.<br><strong>random.org:</strong> 32 байта от атмосферен шум чрез random.org API.<br><strong>Човешки вход:</strong> стойност, казана на глас от участник, обработена чрез PBKDF2.<br><br>Тези три източника се комбинират чрез XOR. Резултатът е непредсказуем, дори ако два от трите са компрометирани — достатъчен е един честен източник.',
+    'doc.sources': '<strong>Локален CSRNG:</strong> 32 байта от crypto.getRandomValues() — вграденият в браузъра хардуерен генератор.<br><strong>random.org:</strong> 32 байта от атмосферен шум чрез random.org API.<br><strong>Човешки вход:</strong> стойност, казана на глас от участник. Деривира се чрез PBKDF2 с детерминистичен salt (SHA-256 на "LoTTERY" + входа).<br><br>Суровите seeds на първите два източника и деривацията на човешкия вход се комбинират чрез XOR. Резултатът е непредсказуем, дори ако два от трите са компрометирани — достатъчен е един честен източник.',
     'doc.xor_title': 'XOR комбиниране',
-    'doc.xor': 'Трите PBKDF2 изхода се комбинират побитово чрез XOR (ексклузивно или). Свойството на XOR е, че ако поне един от входовете е наистина случаен, резултатът също е случаен — независимо от другите входове.',
+    'doc.xor': 'Суровите 32-байтови seeds (локален и отдалечен) се комбинират побитово чрез XOR с детерминистична деривация на човешкия вход: PBKDF2(вход, SHA-256("LoTTERY" || вход), 600 000 итерации).<br><br>Ключово: XOR входовете (суровите seeds) никога не са публични преди фазата на разкриване. QR кодовете показват само PBKDF2 <em>ангажиментите</em>, не самите XOR входове. Ако поне един от трите източника е честен, резултатът е непредсказуем.',
     'doc.rejection_title': 'Rejection Sampling (отхвърляне)',
-    'doc.rejection': 'За да се осигури, че всяко число в зададения диапазон има точно еднаква вероятност, се използва rejection sampling. Ако генерираната стойност попадне в зоната, където модулното деление би дало предимство на някои числа, стойността се отхвърля и се тегли нова. Отхвърлените стойности се показват за пълна прозрачност.',
+    'doc.rejection': 'Когато трябва да преобразуваме случайно число от по-голямо пространство в по-малък диапазон, наивният подход (модулно деление) създава неравномерност.<br><br><strong>Пример:</strong> Ако имаме 17 възможни стойности (0–16) и искаме диапазон [1–4], тогава: стойности 0–3 → резултат 1, стойности 4–7 → резултат 2, стойности 8–11 → резултат 3, стойности 12–15 → резултат 4. Стойност 16 → би дала резултат 1 (17 mod 4 = 1). Резултат 1 получава допълнителен шанс (5 срещу 4).<br><br><em>Диаграмата по-долу показва: зелените клетки са стойности, които се преобразуват равномерно. Розовата клетка е "излишъкът", който предизвиква предпочитание — тя се отхвърля.</em><br><br>Решението: ако генерираната стойност попадне в розовата зона (≥ threshold), тя се отхвърля и се тегли нова. Threshold = output_space − (output_space mod range_size). Отхвърлените стойности се показват в интерфейса за пълна прозрачност.',
     'doc.csrng_title': 'Детерминистичен CSRNG (AES-256-CTR)',
     'doc.csrng': 'Комбинираният seed се използва като ключ за AES-256-CTR. Plaintext и IV са нули — целият изход е детерминистичният AES keystream. Всеки, който знае комбинирания seed, може да възпроизведе точно същата последователност от числа.',
     'doc.log_title': 'Hash-верижен лог',
@@ -131,6 +134,7 @@ const strings: Record<Locale, Record<string, string>> = {
 
     'range.min': 'Min',
     'range.max': 'Max',
+    'range.unique': 'No repeats',
     'range.lock_title': 'Lock range',
     'range.draws': 'Draws',
 
@@ -178,9 +182,11 @@ const strings: Record<Locale, Record<string, string>> = {
     'download.unavailable': 'Unavailable (offline)',
 
     'draw.discarded': 'Discarded',
+    'draw.duplicate': 'Duplicate \u2014 re-drawing',
     'draw.meta': 'Draw #{n} \u2014 {time}',
     'replay.draw_result': 'Draw #{n}: {value}',
     'replay.rejections': '({count} rejections)',
+    'replay.duplicate_rejections': '({count} duplicates)',
 
     'import.invalid_log': 'Invalid log: expected a non-empty array of entries',
     'import.chain_failed': 'Log chain verification failed at entry #{idx}. Continue anyway?',
@@ -193,11 +199,11 @@ const strings: Record<Locale, Record<string, string>> = {
     'doc.commitment_title': 'What is a Commitment?',
     'doc.commitment': 'A commitment is a cryptographic "pledge" to a value without revealing it. We use PBKDF2-HMAC-SHA-256 with 600,000 iterations and a random salt. The QR code contains the PBKDF2 output, the salt, and the iteration count. Anyone can later verify that the revealed seed matches its commitment — but before the reveal, guessing the seed is computationally infeasible.',
     'doc.sources_title': 'Three Entropy Sources',
-    'doc.sources': '<strong>Local CSRNG:</strong> 32 bytes from crypto.getRandomValues() — the browser\'s built-in hardware RNG.<br><strong>random.org:</strong> 32 bytes of atmospheric noise via the random.org API.<br><strong>Human Input:</strong> A value spoken aloud by a participant, processed through PBKDF2.<br><br>These three sources are combined via XOR. The result is unpredictable even if two of the three are compromised — one honest source is sufficient.',
+    'doc.sources': '<strong>Local CSRNG:</strong> 32 bytes from crypto.getRandomValues() — the browser\'s built-in hardware RNG.<br><strong>random.org:</strong> 32 bytes of atmospheric noise via the random.org API.<br><strong>Human Input:</strong> A value spoken aloud by a participant. Derived via PBKDF2 with a deterministic salt (SHA-256 of "LoTTERY" + input).<br><br>The raw seeds of the first two sources and the human input derivation are combined via XOR. The result is unpredictable even if two of the three are compromised — one honest source is sufficient.',
     'doc.xor_title': 'XOR Combination',
-    'doc.xor': 'The three PBKDF2 outputs are combined bitwise using XOR (exclusive or). The property of XOR is that if at least one input is truly random, the output is also random — regardless of the other inputs.',
+    'doc.xor': 'The raw 32-byte seeds (local and remote) are combined bitwise via XOR with a deterministic derivation of the human input: PBKDF2(input, SHA-256("LoTTERY" || input), 600,000 iterations).<br><br>Crucially: the XOR inputs (raw seeds) are never public before the reveal phase. The QR codes display only PBKDF2 <em>commitments</em>, not the XOR inputs themselves. If at least one of the three sources is honest, the combined seed is unpredictable.',
     'doc.rejection_title': 'Rejection Sampling',
-    'doc.rejection': 'To ensure every number in the specified range has exactly equal probability, rejection sampling is used. If the generated value falls in a zone where modular arithmetic would favor some numbers, the value is discarded and a new one is drawn. Discarded values are displayed for full transparency.',
+    'doc.rejection': 'When we need to map a random value from a larger space into a smaller range, the naive approach (modular division) creates non-uniformity.<br><br><strong>Example:</strong> If we have 17 possible values (0\u201316) and want range [1\u20134]: values 0\u20133 \u2192 result 1, values 4\u20137 \u2192 result 2, values 8\u201311 \u2192 result 3, values 12\u201315 \u2192 result 4. Value 16 \u2192 would give result 1 (17 mod 4 = 1). Result 1 gets an extra chance (5 vs 4).<br><br><em>The diagram below illustrates: green cells are values that map uniformly. The pink cell is the "excess" that causes bias \u2014 it is rejected.</em><br><br>The solution: if the generated value falls in the pink zone (\u2265 threshold), it is discarded and a new one is drawn. Threshold = output_space \u2212 (output_space mod range_size). Discarded values are displayed in the UI for full transparency.',
     'doc.csrng_title': 'Deterministic CSRNG (AES-256-CTR)',
     'doc.csrng': 'The combined seed is used as the key for AES-256-CTR. Plaintext and IV are zeros — the entire output is the deterministic AES keystream. Anyone who knows the combined seed can reproduce exactly the same sequence of numbers.',
     'doc.log_title': 'Hash-Chained Log',

@@ -29,14 +29,17 @@
       <div class="qr-strip-item">
         <div class="qr-strip-label" data-i18n="card.local.label">Локален CSRNG</div>
         <div id="strip-local-qr"></div>
+        <div class="qr-params mono" id="strip-local-params"></div>
       </div>
       <div class="qr-strip-item">
         <div class="qr-strip-label" data-i18n="card.remote.label">random.org</div>
         <div id="strip-remote-qr"></div>
+        <div class="qr-params mono" id="strip-remote-params"></div>
       </div>
       <div class="qr-strip-item">
         <div class="qr-strip-label" data-i18n="card.human.label">Човешки вход</div>
         <div id="strip-human-qr"></div>
+        <div class="qr-params mono" id="strip-human-params"></div>
       </div>
     </div>
 
@@ -162,6 +165,10 @@
           <input type="number" id="param-min" value="1">
           <label for="param-max" data-i18n="range.max">Макс</label>
           <input type="number" id="param-max" value="100">
+          <label class="toggle-label">
+            <input type="checkbox" id="param-unique" checked>
+            <span data-i18n="range.unique">Без повторения</span>
+          </label>
           <button id="btn-lock-params" class="lock-btn" data-i18n-title="range.lock_title" title="Заключване на диапазон">
             <svg viewBox="0 0 24 24" width="20" height="20"><use href="#icon-lock-open"/></svg>
           </button>
@@ -223,6 +230,10 @@
           <input type="number" id="replay-min" value="1">
           <label data-i18n="range.max">Макс</label>
           <input type="number" id="replay-max" value="100">
+          <label class="toggle-label">
+            <input type="checkbox" id="replay-unique" checked>
+            <span data-i18n="range.unique">Без повторения</span>
+          </label>
           <label data-i18n="range.draws">Тегления</label>
           <input type="number" id="replay-draw-count" value="1" class="small-input">
         </div>

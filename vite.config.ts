@@ -3,48 +3,91 @@ import { viteSingleFile } from 'vite-plugin-singlefile';
 import { createHash } from 'crypto';
 import { readFileSync, writeFileSync, readdirSync, statSync } from 'fs';
 import { resolve, join } from 'path';
+import type { Plugin } from 'vite';
 import buildConfig from './build.config';
 
-function computeQrLibraryHash(): string {
-  const pkgPath = resolve(__dirname, 'node_modules/qrcode-generator/qrcode.js');
-  const content = readFileSync(pkgPath);
-  return createHash('sha256').update(content).digest('hex');
-}
+const QR_PKG_PATH = resolve(__dirname, 'node_modules/qrcode-generator/qrcode.js');
+const QR_PKG_JSON = resolve(__dirname, 'node_modules/qrcode-generator/package.json');
 
+function sha256Hex(buf: Buffer | string): string {
+  return createHash('sha256').update(buf).digest('hex');
+}
 function sha256Base64(content: string): string {
   return createHash('sha256').update(content, 'utf-8').digest('base64');
 }
 
+const qrPkg = JSON.parse(readFileSync(QR_PKG_JSON, 'utf-8'));
+const qrSource = readFileSync(QR_PKG_PATH, 'utf-8');
+const qrHashHex = sha256Hex(readFileSync(QR_PKG_PATH));
+const qrHashB64 = sha256Base64(qrSource);
+
 /**
- * Extract all inline <script> and <style> blocks from HTML,
- * compute their SHA-256 hashes, and inject a Content-Security-Policy
- * <meta> tag that allowlists exactly those hashes.
+ * Build-only plugin: resolve `import qrcode from 'qrcode-generator'`
+ * to a virtual module that reads from the global `window.qrcode`.
+ * The actual library is injected as a separate <script> in closeBundle.
+ */
+function externalizeQrLibrary(): Plugin {
+  const VIRTUAL_ID = '\0qr-external';
+  return {
+    name: 'externalize-qr-library',
+    apply: 'build',
+    enforce: 'pre',
+    resolveId(id) {
+      if (id === 'qrcode-generator') return VIRTUAL_ID;
+    },
+    load(id) {
+      if (id === VIRTUAL_ID) return 'export default window.qrcode;';
+    },
+  };
+}
+
+/**
+ * Extract top-level <script> and <style> blocks from the HTML
+ * (skipping tags that appear inside other scripts' string content),
+ * compute their SHA-256 hashes, and inject a CSP <meta> tag.
  */
 function injectCSP(html: string): string {
-  const scriptHashes: string[] = [];
-  const styleHashes: string[] = [];
+  const scriptHashes = new Set<string>();
+  const styleHashes = new Set<string>();
 
-  const scriptRe = /<script[^>]*>([\s\S]*?)<\/script>/gi;
-  let m;
-  while ((m = scriptRe.exec(html)) !== null) {
-    const content = m[1];
-    if (content.trim()) {
-      scriptHashes.push(`'sha256-${sha256Base64(content)}'`);
-    }
-  }
+  // Walk through top-level tags only: find each <script>...</script>,
+  // skip its content, then find <style>...</style> outside scripts.
+  let pos = 0;
+  while (pos < html.length) {
+    const scriptOpen = html.indexOf('<script', pos);
+    const styleOpen = html.indexOf('<style', pos);
 
-  const styleRe = /<style[^>]*>([\s\S]*?)<\/style>/gi;
-  while ((m = styleRe.exec(html)) !== null) {
-    const content = m[1];
-    if (content.trim()) {
-      styleHashes.push(`'sha256-${sha256Base64(content)}'`);
+    if (scriptOpen >= 0 && (styleOpen < 0 || scriptOpen < styleOpen)) {
+      const tagEnd = html.indexOf('>', scriptOpen);
+      if (tagEnd < 0) break;
+      const closeTag = '</script>';
+      const closeIdx = html.indexOf(closeTag, tagEnd + 1);
+      if (closeIdx < 0) break;
+      const content = html.slice(tagEnd + 1, closeIdx);
+      if (content.trim()) {
+        scriptHashes.add(`'sha256-${sha256Base64(content)}'`);
+      }
+      pos = closeIdx + closeTag.length;
+    } else if (styleOpen >= 0) {
+      const tagEnd = html.indexOf('>', styleOpen);
+      if (tagEnd < 0) break;
+      const closeTag = '</style>';
+      const closeIdx = html.indexOf(closeTag, tagEnd + 1);
+      if (closeIdx < 0) break;
+      const content = html.slice(tagEnd + 1, closeIdx);
+      if (content.trim()) {
+        styleHashes.add(`'sha256-${sha256Base64(content)}'`);
+      }
+      pos = closeIdx + closeTag.length;
+    } else {
+      break;
     }
   }
 
   const directives = [
     `default-src 'none'`,
-    `script-src ${scriptHashes.join(' ')}`,
-    `style-src ${styleHashes.join(' ')}`,
+    `script-src ${[...scriptHashes].join(' ')}`,
+    `style-src ${[...styleHashes].join(' ')}`,
     `img-src data: blob:`,
     `connect-src ${buildConfig.DISTRIBUTION_URL} https://www.random.org`,
     `form-action 'none'`,
@@ -60,57 +103,57 @@ function injectCSP(html: string): string {
   );
 }
 
-const qrHash = computeQrLibraryHash();
-const qrPkg = JSON.parse(
-  readFileSync(resolve(__dirname, 'node_modules/qrcode-generator/package.json'), 'utf-8'),
-);
-
 export default defineConfig({
   root: 'src',
   define: {
     __DISTRIBUTION_URL__: JSON.stringify(buildConfig.DISTRIBUTION_URL),
     __QR_LIBRARY_VERSION__: JSON.stringify(qrPkg.version),
-    __QR_LIBRARY_INTEGRITY__: JSON.stringify(`sha256-${qrHash}`),
+    __QR_LIBRARY_INTEGRITY__: JSON.stringify(`sha256-${qrHashHex}`),
   },
   plugins: [
+    externalizeQrLibrary(),
     viteSingleFile(),
     {
-      name: 'inject-qr-sri-comment',
-      transformIndexHtml(html) {
-        const comment = [
-          `<!-- QR Code Library: qrcode-generator v${qrPkg.version}`,
-          `     Author: Kazuhiko Arase`,
-          `     Source: https://github.com/kazuhikoarase/qrcode-generator`,
-          `     NPM: https://www.npmjs.com/package/qrcode-generator`,
-          `     Integrity: sha256-${qrHash}`,
-          `     This library is embedded inline and is part of the auditable surface. -->`,
-        ].join('\n');
-        return html.replace('</head>', `${comment}\n</head>`);
-      },
-    },
-    {
-      name: 'inject-csp-and-checksums',
+      name: 'post-build-assembly',
       closeBundle() {
         const distDir = resolve(__dirname, 'dist');
         const htmlPath = join(distDir, 'index.html');
-
-        // 1. Inject CSP meta tag with SHA-256 hashes of all inline scripts/styles
         let html = readFileSync(htmlPath, 'utf-8');
+
+        // 1. Inject QR library as separate <script> with SRI before the app module
+        const qrComment = [
+          `<!-- QR Code Library: qrcode-generator v${qrPkg.version}`,
+          `     Author: Kazuhiko Arase`,
+          `     License: MIT`,
+          `     Source: https://github.com/kazuhikoarase/qrcode-generator`,
+          `     NPM: https://www.npmjs.com/package/qrcode-generator`,
+          `     Verify: npm pack qrcode-generator@${qrPkg.version} && shasum -a 256 qrcode-generator-${qrPkg.version}.tgz`,
+          `     SHA-256 of qrcode.js: ${qrHashHex}`,
+          `     This script is the UNMODIFIED qrcode.js from the npm package. -->`,
+        ].join('\n  ');
+        const qrScriptTag = `${qrComment}\n  <script integrity="sha256-${qrHashB64}">\n${qrSource}</script>`;
+        html = html.replace(
+          /<script type="module"/,
+          `${qrScriptTag}\n  <script type="module"`,
+        );
+
+        // 2. Inject CSP (picks up both scripts + all styles)
         html = injectCSP(html);
         writeFileSync(htmlPath, html);
-        console.log('\nCSP meta tag injected with script/style hashes.');
+        console.log('\nQR library injected as separate <script> with SRI.');
+        console.log('CSP meta tag injected with script/style hashes.');
 
-        // 2. Generate SHA256SUMS (after CSP injection so hash reflects final file)
+        // 3. Generate SHA256SUMS
         const lines: string[] = [];
         for (const file of readdirSync(distDir)) {
           const fullPath = join(distDir, file);
           if (!statSync(fullPath).isFile() || file === 'SHA256SUMS') continue;
-          const hash = createHash('sha256').update(readFileSync(fullPath)).digest('hex');
+          const hash = sha256Hex(readFileSync(fullPath));
           lines.push(`${hash}  ${file}`);
         }
-        const content = lines.join('\n') + '\n';
-        writeFileSync(join(distDir, 'SHA256SUMS'), content);
-        console.log(`SHA256SUMS generated:\n${content}`);
+        const checksums = lines.join('\n') + '\n';
+        writeFileSync(join(distDir, 'SHA256SUMS'), checksums);
+        console.log(`SHA256SUMS generated:\n${checksums}`);
       },
     },
   ],

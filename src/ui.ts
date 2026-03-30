@@ -138,12 +138,55 @@ const DOC_SECTIONS = [
   'overview', 'commitment', 'sources', 'xor', 'rejection', 'csrng', 'log', 'qr', 'verify',
 ] as const;
 
+function rejectionSVG(): string {
+  const cols = 4, rows = 4;
+  const cellW = 80, cellH = 55, gap = 3;
+  const gridW = cols * cellW + (cols - 1) * gap;
+  const gridH = rows * cellH + (rows - 1) * gap;
+  const biasH = cellH;
+  const svgW = gridW + 40;
+  const svgH = gridH + biasH + gap + 60;
+  const ox = 20, oy = 30;
+  const green = '#6b8e23', pink = '#e8a0d8';
+
+  let cells = '';
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const x = ox + c * (cellW + gap);
+      const y = oy + biasH + gap + r * (cellH + gap);
+      const idx = r * cols + c;
+      cells += `<rect x="${x}" y="${y}" width="${cellW}" height="${cellH}" rx="3" fill="${green}" opacity="0.85"/>`;
+      cells += `<text x="${x + cellW / 2}" y="${y + cellH / 2 + 5}" text-anchor="middle" fill="#fff" font-size="13" font-weight="600">${idx}</text>`;
+    }
+  }
+  const biasX = ox + (cols - 1) * (cellW + gap);
+  const biasY = oy;
+  cells += `<rect x="${biasX}" y="${biasY}" width="${cellW}" height="${biasH}" rx="3" fill="${pink}" opacity="0.9"/>`;
+  cells += `<text x="${biasX + cellW / 2}" y="${biasY + biasH / 2 + 5}" text-anchor="middle" fill="#1a1a2e" font-size="13" font-weight="700">16</text>`;
+
+  const labelY = svgH - 8;
+  const legendX = ox;
+
+  return `<svg viewBox="0 0 ${svgW} ${svgH}" style="max-width:420px;width:100%;margin:1rem auto;display:block">
+    <style>text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}</style>
+    ${cells}
+    <rect x="${legendX}" y="${labelY - 10}" width="12" height="12" rx="2" fill="${green}" opacity="0.85"/>
+    <text x="${legendX + 18}" y="${labelY}" fill="#c9d1d9" font-size="11">= threshold (16) — ×4 per outcome</text>
+    <rect x="${legendX + 260}" y="${labelY - 10}" width="12" height="12" rx="2" fill="${pink}" opacity="0.9"/>
+    <text x="${legendX + 278}" y="${labelY}" fill="#c9d1d9" font-size="11">= bias zone — rejected</text>
+  </svg>`;
+}
+
 function getDocWindowHTML(): string {
-  const sections = DOC_SECTIONS.map(id => `
-    <section id="${id}">
+  const sections = DOC_SECTIONS.map(id => {
+    let extra = '';
+    if (id === 'rejection') extra = rejectionSVG();
+    return `<section id="${id}">
       <h2>${t(`doc.${id}_title`)}</h2>
       <p>${t(`doc.${id}`)}</p>
-    </section>`).join('\n');
+      ${extra}
+    </section>`;
+  }).join('\n');
 
   return `<!DOCTYPE html>
 <html lang="${document.documentElement.lang}">
@@ -157,6 +200,8 @@ section{border-bottom:1px solid #30363d;padding-bottom:1rem;margin-bottom:0.5rem
 section:last-child{border-bottom:none}
 p{color:#c9d1d9}
 strong{color:#e6edf3}
+em{color:#8b949e}
+sup,sub{font-size:0.75em}
 code{background:#161b22;padding:0.15rem 0.4rem;border-radius:3px;font-family:'SF Mono','Cascadia Code',monospace;font-size:0.9em}
 :target{background:#1f3a5f;border-radius:6px;padding:0.5rem;margin:-0.5rem}
 </style></head>
@@ -218,6 +263,15 @@ function renderCommitment(
   } else {
     renderQRCode(qrData, stripContainer);
   }
+
+  const paramsId = stripQrId.replace('-qr', '-params');
+  const paramsEl = document.getElementById(paramsId);
+  if (paramsEl) {
+    paramsEl.innerHTML =
+      `<span>salt: ${saltHex}</span>` +
+      `<span>iter: ${iterations.toLocaleString()}</span>`;
+  }
+
   $('qr-strip').classList.remove('hidden');
 }
 
@@ -344,13 +398,15 @@ async function handleHumanInput(): Promise<void> {
 function handleLockParams(): void {
   const min = parseInt(($('param-min') as HTMLInputElement).value, 10);
   const max = parseInt(($('param-max') as HTMLInputElement).value, 10);
+  const allowRepeats = !($('param-unique') as HTMLInputElement).checked;
 
-  ceremony.lockParameters(min, max).then(() => {
+  ceremony.lockParameters(min, max, allowRepeats).then(() => {
     $('range-panel').classList.add('locked');
     const lockBtn = $('btn-lock-params');
     lockBtn.classList.add('locked');
     lockBtn.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20"><use href="#icon-lock-closed"/></svg>';
     (lockBtn as HTMLButtonElement).disabled = true;
+    ($('param-unique') as HTMLInputElement).disabled = true;
     syncButtons();
   }).catch(e => {
     setText('param-error', (e as Error).message);
@@ -384,10 +440,10 @@ async function handleVerify(): Promise<void> {
 
     setLockIcon('local-lock', result.localVerified ? 'check' : 'x');
     setLockIcon('remote-lock', result.remoteVerified ? 'check' : 'x');
+    setLockIcon('human-lock', result.humanVerified ? 'check' : 'x');
     setCardState('card-local', result.localVerified ? 'revealed' : 'failed');
     setCardState('card-remote', result.remoteVerified ? 'revealed' : 'failed');
-    setCardState('card-human', 'revealed');
-    setLockIcon('human-lock', 'check');
+    setCardState('card-human', result.humanVerified ? 'revealed' : 'failed');
 
     const diagram = $('xor-diagram');
     diagram.classList.add('active', 'animate');
@@ -410,6 +466,14 @@ async function handleGenerate(): Promise<void> {
 async function handleDrawNext(): Promise<void> {
   ($('btn-draw-next') as HTMLButtonElement).disabled = true;
   await performDraw();
+
+  const state = ceremony.getState();
+  if (!state.allowRepeats && state.min !== null && state.max !== null) {
+    const rangeSize = state.max - state.min + 1;
+    if (state.draws.length >= rangeSize) {
+      return;
+    }
+  }
   ($('btn-draw-next') as HTMLButtonElement).disabled = false;
 }
 
@@ -427,6 +491,18 @@ async function performDraw(): Promise<void> {
       <span class="info-icon" data-doc="rejection" style="cursor:pointer">&#9432;</span>
     `;
     area.appendChild(entry);
+  }
+
+  if (result.duplicateRejections) {
+    for (const dup of result.duplicateRejections) {
+      const entry = document.createElement('div');
+      entry.className = 'rejection-entry duplicate-rejection';
+      entry.innerHTML = `
+        <span class="rejection-label">${t('draw.duplicate')}</span>
+        <span class="rejection-value">${dup}</span>
+      `;
+      area.appendChild(entry);
+    }
   }
 
   const card = document.createElement('div');
@@ -503,6 +579,9 @@ async function handleImportLogFile(event: Event): Promise<void> {
         case 'PARAMETERS_LOCKED':
           min = (p.min as number) ?? 1;
           max = (p.max as number) ?? 100;
+          if (p.allow_repeats !== undefined) {
+            ($('replay-unique') as HTMLInputElement).checked = !(p.allow_repeats as boolean);
+          }
           break;
         case 'NUMBER_GENERATED':
           drawCount++;
@@ -595,6 +674,7 @@ async function handleReplay(): Promise<void> {
   const min = parseInt(($('replay-min') as HTMLInputElement).value, 10);
   const max = parseInt(($('replay-max') as HTMLInputElement).value, 10);
   const drawCount = parseInt(($('replay-draw-count') as HTMLInputElement).value, 10);
+  const allowRepeats = !($('replay-unique') as HTMLInputElement).checked;
 
   const localSaltHex = ($('replay-local-salt') as HTMLInputElement).value.trim();
   const localIter = parseInt(($('replay-local-iter') as HTMLInputElement).value, 10);
@@ -613,6 +693,7 @@ async function handleReplay(): Promise<void> {
       hexDecode(localSaltHex), localIter,
       hexDecode(remoteSaltHex), remoteIter,
       hexDecode(humanSaltHex), humanIter,
+      allowRepeats,
     );
 
     const { hexEncode: hex } = await import('./crypto');
@@ -631,8 +712,10 @@ async function handleReplay(): Promise<void> {
     result.draws.forEach((draw, i) => {
       const div = document.createElement('div');
       div.className = 'replay-result-item';
+      const dupCount = draw.duplicateRejections?.length ?? 0;
       div.textContent = t('replay.draw_result', { n: String(i + 1), value: String(draw.value) }) +
-        (draw.rejections.length > 0 ? ` ${t('replay.rejections', { count: String(draw.rejections.length) })}` : '');
+        (draw.rejections.length > 0 ? ` ${t('replay.rejections', { count: String(draw.rejections.length) })}` : '') +
+        (dupCount > 0 ? ` ${t('replay.duplicate_rejections', { count: String(dupCount) })}` : '');
       output.appendChild(div);
     });
     show('replay-results');

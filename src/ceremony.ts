@@ -1,6 +1,7 @@
 import {
   generateSeed, createCommitment, verifyCommitment, computePBKDF2,
   xorThree, hexEncode, hexDecode, textToBytes, generateRandomBytes,
+  deriveHumanContribution,
   type Commitment, PBKDF2_ITERATIONS,
 } from './crypto';
 import { CSRNG } from './csrng';
@@ -27,6 +28,7 @@ export interface CeremonyState {
   humanCommitment: Commitment | null;
   min: number | null;
   max: number | null;
+  allowRepeats: boolean;
   combinedSeed: Uint8Array | null;
   rng: CSRNG | null;
   draws: DrawResult[];
@@ -48,6 +50,7 @@ function initialState(): CeremonyState {
     humanCommitment: null,
     min: null,
     max: null,
+    allowRepeats: true,
     combinedSeed: null,
     rng: null,
     draws: [],
@@ -138,7 +141,7 @@ export class Ceremony {
    * Lock the output range. Can be called at any point during the ceremony.
    * Must be locked before drawing.
    */
-  async lockParameters(min: number, max: number): Promise<void> {
+  async lockParameters(min: number, max: number, allowRepeats: boolean = true): Promise<void> {
     if (this.state.parametersLocked) {
       throw new Error('Parameters are already locked');
     }
@@ -154,9 +157,10 @@ export class Ceremony {
 
     this.state.min = min;
     this.state.max = max;
+    this.state.allowRepeats = allowRepeats;
     this.state.parametersLocked = true;
 
-    await this.emit('PARAMETERS_LOCKED', { min, max });
+    await this.emit('PARAMETERS_LOCKED', { min, max, allow_repeats: allowRepeats });
   }
 
   async receiveHumanInput(input: string): Promise<Commitment> {
@@ -211,28 +215,27 @@ export class Ceremony {
   }
 
   /**
-   * Verify commitments against revealed seeds, XOR the PBKDF2 outputs,
+   * Verify commitments against revealed seeds, XOR the raw seeds
+   * (local, remote) with the human input's deterministic derivation,
    * and initialize the CSRNG.
    */
-  async verifyAndCombine(): Promise<{ localVerified: boolean; remoteVerified: boolean }> {
+  async verifyAndCombine(): Promise<{ localVerified: boolean; remoteVerified: boolean; humanVerified: boolean }> {
     this.assertStep('SEEDS_REVEALED');
 
-    const { localSeed, localCommitment, remoteSeed, remoteCommitment, humanCommitment } = this.state;
-    if (!localSeed || !localCommitment || !remoteSeed || !remoteCommitment || !humanCommitment) {
+    const { localSeed, localCommitment, remoteSeed, remoteCommitment, humanInput, humanCommitment } = this.state;
+    if (!localSeed || !localCommitment || !remoteSeed || !remoteCommitment || humanInput === null || !humanCommitment) {
       throw new Error('Missing seeds or commitments');
     }
 
     const localVerified = await verifyCommitment(localSeed, localCommitment);
     const remoteVerified = await verifyCommitment(remoteSeed, remoteCommitment);
+    const humanVerified = await verifyCommitment(textToBytes(humanInput), humanCommitment);
 
     this.state.localVerified = localVerified;
     this.state.remoteVerified = remoteVerified;
 
-    const combinedSeed = xorThree(
-      localCommitment.pbkdf2Output,
-      remoteCommitment.pbkdf2Output,
-      humanCommitment.pbkdf2Output,
-    );
+    const humanContribution = await deriveHumanContribution(humanInput);
+    const combinedSeed = xorThree(localSeed, remoteSeed, humanContribution);
 
     this.state.combinedSeed = combinedSeed;
     this.state.rng = await CSRNG.create(combinedSeed);
@@ -241,10 +244,11 @@ export class Ceremony {
     await this.emit('COMMITMENTS_VERIFIED', {
       local_verified: localVerified,
       remote_verified: remoteVerified,
+      human_verified: humanVerified,
       combined_seed: hexEncode(combinedSeed),
     });
 
-    return { localVerified, remoteVerified };
+    return { localVerified, remoteVerified, humanVerified };
   }
 
   async draw(): Promise<DrawResult> {
@@ -254,18 +258,45 @@ export class Ceremony {
       throw new Error('Parameters must be locked before drawing');
     }
 
-    const { rng, min, max } = this.state;
+    const { rng, min, max, allowRepeats, draws } = this.state;
     if (!rng || min === null || max === null) {
       throw new Error('Missing RNG or parameters');
     }
 
-    const result = await rejectionSample(rng, min, max);
+    if (!allowRepeats) {
+      const rangeSize = max - min + 1;
+      if (draws.length >= rangeSize) {
+        throw new Error('All unique values in the range have been drawn');
+      }
+    }
 
-    for (const rejected of result.rejections) {
-      await this.emit('VALUE_REJECTED', {
-        rejected_value: rejected.toString(),
-        reason: 'Rejection sampling: value exceeds threshold, would introduce modulo bias',
-      });
+    const drawnValues = allowRepeats ? null : new Set(draws.map(d => d.value));
+    let result: DrawResult;
+    const duplicateRejections: number[] = [];
+
+    for (;;) {
+      result = await rejectionSample(rng, min, max);
+
+      for (const rejected of result.rejections) {
+        await this.emit('VALUE_REJECTED', {
+          rejected_value: rejected.toString(),
+          reason: 'Rejection sampling: value exceeds threshold, would introduce modulo bias',
+        });
+      }
+
+      if (drawnValues && drawnValues.has(result.value)) {
+        duplicateRejections.push(result.value);
+        await this.emit('VALUE_REJECTED', {
+          rejected_value: result.value.toString(),
+          reason: 'Duplicate rejection: value already drawn, re-drawing for uniqueness',
+        });
+        continue;
+      }
+      break;
+    }
+
+    if (duplicateRejections.length > 0) {
+      result = { ...result, duplicateRejections };
     }
 
     this.state.draws.push(result);
@@ -275,6 +306,7 @@ export class Ceremony {
       draw_number: this.state.draws.length,
       value: result.value,
       rejections_count: result.rejections.length,
+      duplicate_rejections_count: duplicateRejections.length,
     });
 
     return result;
@@ -303,6 +335,7 @@ export async function replayCeremony(
   remoteIterations: number,
   humanSalt: Uint8Array,
   humanIterations: number,
+  allowRepeats: boolean = true,
 ): Promise<{
   draws: DrawResult[];
   log: CeremonyLog;
@@ -320,12 +353,28 @@ export async function replayCeremony(
   const remotePbkdf2 = await computePBKDF2(remoteSeed, remoteSalt, remoteIterations);
   const humanPbkdf2 = await computePBKDF2(humanBytes, humanSalt, humanIterations);
 
-  const combinedSeed = xorThree(localPbkdf2, remotePbkdf2, humanPbkdf2);
+  const humanContribution = await deriveHumanContribution(humanInput);
+  const combinedSeed = xorThree(localSeed, remoteSeed, humanContribution);
   const rng = await CSRNG.create(combinedSeed);
 
+  const drawnValues = allowRepeats ? null : new Set<number>();
   const draws: DrawResult[] = [];
   for (let i = 0; i < drawCount; i++) {
-    draws.push(await rejectionSample(rng, min, max));
+    const duplicateRejections: number[] = [];
+    let result: DrawResult;
+    for (;;) {
+      result = await rejectionSample(rng, min, max);
+      if (drawnValues && drawnValues.has(result.value)) {
+        duplicateRejections.push(result.value);
+        continue;
+      }
+      break;
+    }
+    if (duplicateRejections.length > 0) {
+      result = { ...result, duplicateRejections };
+    }
+    drawnValues?.add(result.value);
+    draws.push(result);
   }
 
   const log = new CeremonyLog();

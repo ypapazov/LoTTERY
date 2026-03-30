@@ -56,6 +56,7 @@ describe('Ceremony state machine', () => {
     const verification = await c.verifyAndCombine();
     expect(verification.localVerified).toBe(true);
     expect(verification.remoteVerified).toBe(true);
+    expect(verification.humanVerified).toBe(true);
     expect(c.getState().step).toBe('VERIFIED');
 
     const draw1 = await c.draw();
@@ -132,6 +133,42 @@ describe('Ceremony state machine', () => {
     const entries = JSON.parse(c.getLog().export());
     const invalidIdx = await verifyLogChain(entries);
     expect(invalidIdx).toBe(-1);
+  });
+
+  it('draws unique values when allowRepeats is false', async () => {
+    const c = new Ceremony();
+    await c.lockParameters(1, 5, false);
+    await c.generateLocalSeed();
+    await c.setRemoteSeed('dd'.repeat(32));
+    await c.receiveHumanInput('unique test');
+    await c.revealSeeds();
+    await c.verifyAndCombine();
+
+    const values = new Set<number>();
+    for (let i = 0; i < 5; i++) {
+      const draw = await c.draw();
+      expect(values.has(draw.value)).toBe(false);
+      values.add(draw.value);
+    }
+    expect(values.size).toBe(5);
+
+    await expect(c.draw()).rejects.toThrow('All unique values');
+  });
+
+  it('allows repeated values when allowRepeats is true', async () => {
+    const c = new Ceremony();
+    await c.lockParameters(1, 2, true);
+    await c.generateLocalSeed();
+    await c.setRemoteSeed('ee'.repeat(32));
+    await c.receiveHumanInput('repeat test');
+    await c.revealSeeds();
+    await c.verifyAndCombine();
+
+    for (let i = 0; i < 10; i++) {
+      const draw = await c.draw();
+      expect(draw.value).toBeGreaterThanOrEqual(1);
+      expect(draw.value).toBeLessThanOrEqual(2);
+    }
   });
 
   it('reset returns to INIT', async () => {

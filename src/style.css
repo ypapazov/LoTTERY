@@ -118,6 +118,17 @@ button.danger { border-color: var(--red); color: var(--red); }
   padding: 4px;
   border-radius: 4px;
 }
+.qr-params {
+  font-size: 0.55rem;
+  color: var(--text-muted);
+  word-break: break-all;
+  text-align: left;
+  max-width: 100%;
+  line-height: 1.4;
+  margin-top: 0.25rem;
+}
+.qr-params:empty { display: none; }
+.qr-params span { display: block; }
 
 /* ===== Main ===== */
 main { padding: 1.5rem 2rem; max-width: 1100px; margin: 0 auto; }
@@ -369,6 +380,22 @@ main { padding: 1.5rem 2rem; max-width: 1100px; margin: 0 auto; }
 
 .rejection-entry .info-icon {
   cursor: pointer;
+}
+.rejection-entry.duplicate-rejection .rejection-label {
+  color: var(--text-muted);
+}
+
+/* ===== Toggle Label ===== */
+.toggle-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+  user-select: none;
+}
+.toggle-label input[type="checkbox"] {
+  accent-color: var(--primary);
 }
 
 /* ===== Sticky Draw Bar ===== */

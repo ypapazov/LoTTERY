@@ -3,6 +3,7 @@ import { CSRNG } from './csrng';
 export interface DrawResult {
   value: number;
   rejections: bigint[];
+  duplicateRejections?: number[];
 }
 
 /**

@@ -104,4 +104,20 @@ export function textToBytes(text: string): Uint8Array {
   return new TextEncoder().encode(text);
 }
 
+const HUMAN_DOMAIN_SALT = 'LoTTERY';
+
+/**
+ * Derive the human input's XOR contribution:
+ * PBKDF2-HMAC-SHA-256(input, SHA-256("LoTTERY" || input), 600000)
+ *
+ * Uses a deterministic, input-dependent salt (domain-separated SHA-256)
+ * to avoid precomputation while keeping the derivation reproducible.
+ */
+export async function deriveHumanContribution(input: string): Promise<Uint8Array> {
+  const inputBytes = textToBytes(input);
+  const saltInput = textToBytes(HUMAN_DOMAIN_SALT + input);
+  const salt = await sha256(saltInput);
+  return computePBKDF2(inputBytes, salt, PBKDF2_ITERATIONS);
+}
+
 export { PBKDF2_ITERATIONS, SEED_BYTES };
