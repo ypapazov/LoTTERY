@@ -30,13 +30,9 @@ jobs:
       - run: npm run build
       - run: npm run validate
 
-      - name: Prepare Pages artifact
-        run: |
-          mkdir -p _site
-          cp dist/index.html _site/ceremony.html
-          cp dist/SHA256SUMS _site/
-
       - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
 
   deploy:
     needs: build
