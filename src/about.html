@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Какво е LoTTERY?</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;background:#0d1117;color:#e6edf3;line-height:1.8;padding:2rem;max-width:720px;margin:0 auto}
+h1{font-size:1.5rem;color:#58a6ff;margin-bottom:1.5rem;border-bottom:1px solid #30363d;padding-bottom:0.75rem}
+h2{font-size:1.1rem;color:#58a6ff;margin:2rem 0 0.5rem}
+p{color:#c9d1d9;margin-bottom:1rem}
+strong{color:#e6edf3}
+a{color:#58a6ff;text-decoration:none}
+a:hover{text-decoration:underline}
+.lang-switch{text-align:right;margin-bottom:1rem;font-size:0.9rem}
+.cta{display:inline-block;margin-top:1.5rem;padding:0.6rem 1.2rem;background:#238636;color:#fff;border-radius:6px;font-weight:600;text-decoration:none}
+.cta:hover{background:#2ea043;text-decoration:none}
+ol{padding-left:1.5rem;margin-bottom:1rem}
+li{margin-bottom:0.5rem;color:#c9d1d9}
+</style>
+</head>
+<body>
+<div class="lang-switch"><a href="#" id="toggle-lang">English</a></div>
+
+<div id="content-bg">
+<h1>Какво е LoTTERY и защо ви засяга</h1>
+
+<h2>Проблемът</h2>
+<p>Когато се тегли жребий за нещо важно — кои машини за гласуване ще бъдат проверени, кой получава място в училище, кой печели публична лотария — как знаете, че жребият е честен? Досега отговорът беше: „Вярвайте ни."</p>
+
+<h2>Решението</h2>
+<p>LoTTERY е инструмент за <strong>публично проверим случаен избор</strong>. Вместо да вярвате на един компютър или един човек, той комбинира три независими източника на случайност:</p>
+<ol>
+<li><strong>Компютърът</strong> — генерира случайно число чрез хардуер</li>
+<li><strong>Интернет</strong> — получава случайно число от външна услуга (random.org)</li>
+<li><strong>Човек</strong> — произнася число на глас пред публиката</li>
+</ol>
+<p>Тези три числа се комбинират така, че за да се излъже, трябва <strong>и трите</strong> да са компрометирани едновременно. Ако поне едно е честно — резултатът е честен.</p>
+
+<h2>Как се проверява?</h2>
+<ol>
+<li>По време на церемонията на екрана се показват QR кодове — снимайте ги</li>
+<li>След церемонията изтеглете лог файла</li>
+<li>Отворете копие на инструмента и използвайте режим „Повторение"</li>
+<li>Ако числата съвпаднат — жребият е бил честен</li>
+</ol>
+
+<h2>Защо да му вярвам?</h2>
+<p>Не е нужно да вярвате. Целият софтуер е един-единствен четим файл, който всеки програмист може да провери за часове. QR кодовете са като разписки — те доказват какво е било „обещано" преди да се разкрие резултатът. А режимът за повторение означава, че всеки може да пресъздаде теглението у дома.</p>
+
+<a class="cta" href="index.html">Отвори инструмента →</a>
+</div>
+
+<div id="content-en" style="display:none">
+<h1>What is LoTTERY and why it matters to you</h1>
+
+<h2>The problem</h2>
+<p>When a draw determines something important — which voting machines get audited, who gets a school placement, who wins a public lottery — how do you know it's fair? Until now the answer was: "Trust us."</p>
+
+<h2>The solution</h2>
+<p>LoTTERY is a tool for <strong>publicly verifiable random selection</strong>. Instead of trusting one computer or one person, it combines three independent sources of randomness:</p>
+<ol>
+<li><strong>The computer</strong> — generates a random number using hardware</li>
+<li><strong>The internet</strong> — receives a random number from an external service (random.org)</li>
+<li><strong>A person</strong> — speaks a number aloud in front of the audience</li>
+</ol>
+<p>These three numbers are combined so that cheating requires <strong>all three</strong> to be compromised simultaneously. If even one is honest — the result is fair.</p>
+
+<h2>How to verify?</h2>
+<ol>
+<li>During the ceremony, QR codes appear on screen — photograph them</li>
+<li>After the ceremony, download the log file</li>
+<li>Open a copy of the tool and use "Replay" mode</li>
+<li>If the numbers match — the draw was fair</li>
+</ol>
+
+<h2>Why trust it?</h2>
+<p>You don't have to trust it. The entire software is a single readable file that any programmer can review in hours. The QR codes are like receipts — they prove what was "promised" before the result was revealed. And the replay mode means anyone can recreate the draw at home.</p>
+
+<a class="cta" href="index.html">Open the tool →</a>
+</div>
+
+<script>
+document.getElementById('toggle-lang').addEventListener('click', function(e) {
+  e.preventDefault();
+  var bg = document.getElementById('content-bg');
+  var en = document.getElementById('content-en');
+  if (bg.style.display === 'none') {
+    bg.style.display = '';
+    en.style.display = 'none';
+    this.textContent = 'English';
+  } else {
+    bg.style.display = 'none';
+    en.style.display = '';
+    this.textContent = 'Български';
+  }
+});
+</script>
+</body>
+</html>

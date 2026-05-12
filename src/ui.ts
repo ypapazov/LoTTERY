@@ -145,54 +145,78 @@ const DOC_SECTIONS = [
 ] as const;
 
 function rejectionSVG(): string {
-  const cols = 4, rows = 4;
-  const cellW = 80, cellH = 55, gap = 3;
-  const gridW = cols * cellW + (cols - 1) * gap;
-  const gridH = rows * cellH + (rows - 1) * gap;
-  const footerH = 28;
-  const biasRowGap = gap + 6;
-  const svgW = gridW + 40;
-  const svgH = cellH + biasRowGap + gridH + gap + footerH + 50;
-  const ox = 20, oy = 20;
-  const green = '#6b8e23', red = '#d32f2f';
-  const outcomes = [4, 1, 2, 3];
+  const cellW = 48, cellH = 44, gap = 2;
+  const colGap = 4;
+  const green = '#2d6a4f', red = '#d32f2f', blue = '#1565c0';
+  const borderColor = '#58a6ff';
 
-  let cells = '';
+  function urnDiagram(title: string, columns: number[][], labels: string[], colColors: string[], w: number, h: number, ox: number, oy: number): string {
+    let svg = '';
+    const maxRows = Math.max(...columns.map(c => c.length));
+    const totalW = columns.length * cellW + (columns.length - 1) * colGap;
+    const headerH = 22;
+    const labelH = 26;
+    const gridH = maxRows * (cellH + gap) - gap;
 
-  const biasY = oy;
-  cells += `<rect x="${ox}" y="${biasY}" width="${cellW}" height="${cellH}" rx="3" fill="${red}"/>`;
-  cells += `<text x="${ox + cellW / 2}" y="${biasY + cellH / 2 + 5}" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">16</text>`;
+    svg += `<text x="${ox + totalW / 2}" y="${oy}" text-anchor="middle" fill="#e6edf3" font-size="12" font-weight="700">${title}</text>`;
 
-  const gridTop = oy + cellH + biasRowGap;
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      const x = ox + c * (cellW + gap);
-      const y = gridTop + r * (cellH + gap);
-      const idx = (rows - 1 - r) * cols + c;
-      cells += `<rect x="${x}" y="${y}" width="${cellW}" height="${cellH}" rx="3" fill="${green}" opacity="0.85"/>`;
-      cells += `<text x="${x + cellW / 2}" y="${y + cellH / 2 + 5}" text-anchor="middle" fill="#fff" font-size="13" font-weight="600">${idx}</text>`;
+    const gridTop = oy + headerH;
+    for (let c = 0; c < columns.length; c++) {
+      const colX = ox + c * (cellW + colGap);
+      const col = columns[c];
+      svg += `<rect x="${colX - 1}" y="${gridTop - 1}" width="${cellW + 2}" height="${gridH + 2}" rx="2" fill="none" stroke="${borderColor}" stroke-width="1.5" opacity="0.6"/>`;
+      for (let r = 0; r < col.length; r++) {
+        const y = gridTop + (maxRows - 1 - r) * (cellH + gap);
+        svg += `<rect x="${colX}" y="${y}" width="${cellW}" height="${cellH}" rx="3" fill="${colColors[c]}" opacity="0.9"/>`;
+        svg += `<text x="${colX + cellW / 2}" y="${y + cellH / 2 + 5}" text-anchor="middle" fill="#fff" font-size="12" font-weight="600">${col[r]}</text>`;
+      }
     }
+
+    const labelTop = gridTop + gridH + 8;
+    for (let c = 0; c < columns.length; c++) {
+      const colX = ox + c * (cellW + colGap);
+      svg += `<rect x="${colX}" y="${labelTop}" width="${cellW}" height="${labelH}" rx="3" fill="#21262d"/>`;
+      svg += `<text x="${colX + cellW / 2}" y="${labelTop + labelH / 2 + 5}" text-anchor="middle" fill="#c9d1d9" font-size="11" font-weight="600">${labels[c]}</text>`;
+    }
+
+    return svg;
   }
 
-  const footerTop = gridTop + gridH + gap;
-  let footer = '';
-  for (let c = 0; c < cols; c++) {
-    const rx = ox + c * (cellW + gap);
-    footer += `<rect x="${rx}" y="${footerTop}" width="${cellW}" height="${footerH}" rx="3" fill="#21262d"/>`;
-    footer += `<text x="${rx + cellW / 2}" y="${footerTop + footerH / 2 + 5}" text-anchor="middle" fill="#c9d1d9" font-size="12" font-weight="600">= ${outcomes[c]}</text>`;
-  }
+  const biasedCols = [[0, 6], [1, 7], [2], [3], [4], [5]];
+  const biasedLabels = ['⚀ 2/8', '⚁ 2/8', '⚂ 1/8', '⚃ 1/8', '⚄ 1/8', '⚅ 1/8'];
+  const biasedColors = [red, red, green, green, green, green];
+
+  const fairCols = [[0], [1], [2], [3], [4], [5]];
+  const fairLabels = ['⚀ 1/6', '⚁ 1/6', '⚂ 1/6', '⚃ 1/6', '⚄ 1/6', '⚅ 1/6'];
+  const fairColors = [green, green, green, green, green, green];
+
+  const diagramW = 6 * cellW + 5 * colGap;
+  const diagramH = 2 * (cellH + gap) - gap + 22 + 26 + 8;
+  const totalW = diagramW * 2 + 50;
+  const svgH = diagramH + 70;
+
+  let content = '';
+  content += urnDiagram('Modulo (biased)', biasedCols, biasedLabels, biasedColors, diagramW, diagramH, 10, 24);
+  content += urnDiagram('Rejection sampling (fair)', fairCols, fairLabels, fairColors, diagramW, diagramH, diagramW + 50, 24);
+
+  const rejX = diagramW + 50 + diagramW + 16;
+  const rejY = 24 + 22;
+  content += `<rect x="${diagramW + 50 + diagramW + 8}" y="${rejY}" width="${cellW}" height="${cellH}" rx="3" fill="${red}" opacity="0.7"/>`;
+  content += `<text x="${diagramW + 50 + diagramW + 8 + cellW / 2}" y="${rejY + cellH / 2 - 4}" text-anchor="middle" fill="#fff" font-size="10" font-weight="600">6</text>`;
+  content += `<text x="${diagramW + 50 + diagramW + 8 + cellW / 2}" y="${rejY + cellH / 2 + 10}" text-anchor="middle" fill="#fff" font-size="10" font-weight="600">7</text>`;
+  content += `<text x="${diagramW + 50 + diagramW + 8 + cellW / 2}" y="${rejY + cellH + 14}" text-anchor="middle" fill="#d32f2f" font-size="9" font-weight="700">rejected</text>`;
+
+  const fullW = diagramW * 2 + 50 + cellW + 20;
 
   const legendY = svgH - 8;
-  const legendX = ox;
+  content += `<rect x="10" y="${legendY - 10}" width="12" height="12" rx="2" fill="${red}"/>`;
+  content += `<text x="28" y="${legendY}" fill="#c9d1d9" font-size="10">= biased (extra chance) or rejected</text>`;
+  content += `<rect x="${fullW / 2}" y="${legendY - 10}" width="12" height="12" rx="2" fill="${green}"/>`;
+  content += `<text x="${fullW / 2 + 18}" y="${legendY}" fill="#c9d1d9" font-size="10">= fair (equal probability)</text>`;
 
-  return `<svg viewBox="0 0 ${svgW} ${svgH}" style="max-width:420px;width:100%;margin:1rem auto;display:block">
+  return `<svg viewBox="0 0 ${fullW} ${svgH}" style="max-width:680px;width:100%;margin:1rem auto;display:block">
     <style>text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}</style>
-    ${cells}
-    ${footer}
-    <rect x="${legendX}" y="${legendY - 10}" width="12" height="12" rx="2" fill="${green}" opacity="0.85"/>
-    <text x="${legendX + 18}" y="${legendY}" fill="#c9d1d9" font-size="11">= threshold (16) — ×4 per outcome</text>
-    <rect x="${legendX + 260}" y="${legendY - 10}" width="12" height="12" rx="2" fill="${red}"/>
-    <text x="${legendX + 278}" y="${legendY}" fill="#c9d1d9" font-size="11">= bias zone — rejected</text>
+    ${content}
   </svg>`;
 }
 
@@ -637,7 +661,7 @@ async function handleImportLogFile(event: Event): Promise<void> {
 function handleSelfDownload(): void {
   const a = document.createElement('a');
   a.href = window.location.href;
-  a.download = 'ceremony.html';
+  a.download = 'index.html';
   a.click();
 }
 

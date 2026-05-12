@@ -1,0 +1,50 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci --ignore-scripts
+      - run: npm test
+      - run: npm run build
+      - run: npm run validate
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            --title "LoTTERY ${{ github.ref_name }}" \
+            --notes "$(cat <<'EOF'
+          ## Artifacts
+
+          - **index.html** — the ceremony tool (single self-contained HTML file)
+          - **SHA256SUMS** — SHA-256 hash of `index.html`
+
+          ## Verification
+
+          ```bash
+          shasum -a 256 -c SHA256SUMS
+          ```
+
+          For a full structural audit, clone the repo at this tag and run:
+          ```bash
+          npm ci --ignore-scripts && npm run validate
+          ```
+          EOF
+          )" \
+            dist/index.html \
+            dist/SHA256SUMS

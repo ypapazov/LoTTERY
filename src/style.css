@@ -52,7 +52,18 @@ body {
 }
 
 .toolbar h1 { font-size: 1rem; font-weight: 700; letter-spacing: 0.05em; margin-right: auto; }
-.toolbar-actions { display: flex; gap: 0.5rem; }
+.toolbar-actions { display: flex; gap: 0.5rem; align-items: center; }
+
+#btn-about {
+  color: #58a6ff;
+  text-decoration: none;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.35rem 0.6rem;
+  border-radius: 4px;
+  border: 1px solid #30363d;
+}
+#btn-about:hover { background: #161b22; }
 
 .lang-btn {
   font-weight: 700;
@@ -545,7 +556,8 @@ input:focus { outline: none; border-color: var(--accent); }
 }
 
 /* ===== Presentation Mode ===== */
-body.presentation-mode .toolbar-actions button:not(#btn-presentation):not(#btn-reset) { display: none; }
+body.presentation-mode .toolbar-actions button:not(#btn-presentation):not(#btn-reset),
+body.presentation-mode #btn-about { display: none; }
 body.presentation-mode .log-bar { display: none; }
 
 body.presentation-mode .result-card .result-number { font-size: 8rem; }

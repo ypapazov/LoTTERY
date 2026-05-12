@@ -145,7 +145,12 @@ export default defineConfig({
         console.log('\nQR library injected as separate <script> with SRI.');
         console.log('CSP meta tag injected with script/style hashes.');
 
-        // 3. Generate SHA256SUMS
+        // 3. Copy about.html as a static page
+        const aboutSrc = resolve(__dirname, 'src', 'about.html');
+        const aboutDest = join(distDir, 'about.html');
+        writeFileSync(aboutDest, readFileSync(aboutSrc, 'utf-8'));
+
+        // 4. Generate SHA256SUMS
         const lines: string[] = [];
         for (const file of readdirSync(distDir)) {
           const fullPath = join(distDir, file);
