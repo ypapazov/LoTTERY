@@ -90,11 +90,11 @@ function openLogWindow(): void {
     logWindow.focus();
     return;
   }
-  logWindow = window.open('', 'lottery-log', 'width=520,height=600,scrollbars=yes,resizable=yes');
+  const blob = new Blob([getLogWindowHTML()], { type: 'text/html' });
+  const blobUrl = URL.createObjectURL(blob);
+  logWindow = window.open(blobUrl, 'lottery-log', 'width=520,height=600,scrollbars=yes,resizable=yes');
+  URL.revokeObjectURL(blobUrl);
   if (!logWindow) return;
-  logWindow.document.open();
-  logWindow.document.write(getLogWindowHTML());
-  logWindow.document.close();
 
   const flush = () => {
     for (const entry of pendingLogEntries) {
@@ -149,37 +149,50 @@ function rejectionSVG(): string {
   const cellW = 80, cellH = 55, gap = 3;
   const gridW = cols * cellW + (cols - 1) * gap;
   const gridH = rows * cellH + (rows - 1) * gap;
-  const biasH = cellH;
+  const footerH = 28;
+  const biasRowGap = gap + 6;
   const svgW = gridW + 40;
-  const svgH = gridH + biasH + gap + 60;
-  const ox = 20, oy = 30;
-  const green = '#6b8e23', pink = '#e8a0d8';
+  const svgH = cellH + biasRowGap + gridH + gap + footerH + 50;
+  const ox = 20, oy = 20;
+  const green = '#6b8e23', red = '#d32f2f';
+  const outcomes = [4, 1, 2, 3];
 
   let cells = '';
+
+  const biasY = oy;
+  cells += `<rect x="${ox}" y="${biasY}" width="${cellW}" height="${cellH}" rx="3" fill="${red}"/>`;
+  cells += `<text x="${ox + cellW / 2}" y="${biasY + cellH / 2 + 5}" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">16</text>`;
+
+  const gridTop = oy + cellH + biasRowGap;
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       const x = ox + c * (cellW + gap);
-      const y = oy + biasH + gap + r * (cellH + gap);
-      const idx = r * cols + c;
+      const y = gridTop + r * (cellH + gap);
+      const idx = (rows - 1 - r) * cols + c;
       cells += `<rect x="${x}" y="${y}" width="${cellW}" height="${cellH}" rx="3" fill="${green}" opacity="0.85"/>`;
       cells += `<text x="${x + cellW / 2}" y="${y + cellH / 2 + 5}" text-anchor="middle" fill="#fff" font-size="13" font-weight="600">${idx}</text>`;
     }
   }
-  const biasX = ox + (cols - 1) * (cellW + gap);
-  const biasY = oy;
-  cells += `<rect x="${biasX}" y="${biasY}" width="${cellW}" height="${biasH}" rx="3" fill="${pink}" opacity="0.9"/>`;
-  cells += `<text x="${biasX + cellW / 2}" y="${biasY + biasH / 2 + 5}" text-anchor="middle" fill="#1a1a2e" font-size="13" font-weight="700">16</text>`;
 
-  const labelY = svgH - 8;
+  const footerTop = gridTop + gridH + gap;
+  let footer = '';
+  for (let c = 0; c < cols; c++) {
+    const rx = ox + c * (cellW + gap);
+    footer += `<rect x="${rx}" y="${footerTop}" width="${cellW}" height="${footerH}" rx="3" fill="#21262d"/>`;
+    footer += `<text x="${rx + cellW / 2}" y="${footerTop + footerH / 2 + 5}" text-anchor="middle" fill="#c9d1d9" font-size="12" font-weight="600">= ${outcomes[c]}</text>`;
+  }
+
+  const legendY = svgH - 8;
   const legendX = ox;
 
   return `<svg viewBox="0 0 ${svgW} ${svgH}" style="max-width:420px;width:100%;margin:1rem auto;display:block">
     <style>text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}</style>
     ${cells}
-    <rect x="${legendX}" y="${labelY - 10}" width="12" height="12" rx="2" fill="${green}" opacity="0.85"/>
-    <text x="${legendX + 18}" y="${labelY}" fill="#c9d1d9" font-size="11">= threshold (16) — ×4 per outcome</text>
-    <rect x="${legendX + 260}" y="${labelY - 10}" width="12" height="12" rx="2" fill="${pink}" opacity="0.9"/>
-    <text x="${legendX + 278}" y="${labelY}" fill="#c9d1d9" font-size="11">= bias zone — rejected</text>
+    ${footer}
+    <rect x="${legendX}" y="${legendY - 10}" width="12" height="12" rx="2" fill="${green}" opacity="0.85"/>
+    <text x="${legendX + 18}" y="${legendY}" fill="#c9d1d9" font-size="11">= threshold (16) — ×4 per outcome</text>
+    <rect x="${legendX + 260}" y="${legendY - 10}" width="12" height="12" rx="2" fill="${red}"/>
+    <text x="${legendX + 278}" y="${legendY}" fill="#c9d1d9" font-size="11">= bias zone — rejected</text>
   </svg>`;
 }
 
@@ -228,13 +241,13 @@ function openDocWindow(scrollTo?: string): void {
     docWindow.focus();
     return;
   }
-  docWindow = window.open('', 'lottery-doc', 'width=640,height=700,scrollbars=yes,resizable=yes');
+  const blob = new Blob([getDocWindowHTML()], { type: 'text/html' });
+  const blobUrl = URL.createObjectURL(blob);
+  docWindow = window.open(blobUrl, 'lottery-doc', 'width=640,height=700,scrollbars=yes,resizable=yes');
+  URL.revokeObjectURL(blobUrl);
   if (!docWindow) return;
-  docWindow.document.open();
-  docWindow.document.write(getDocWindowHTML());
-  docWindow.document.close();
   if (scrollTo) {
-    docWindow.location.hash = scrollTo;
+    setTimeout(() => { docWindow!.location.hash = scrollTo!; }, 100);
   }
 }
 
