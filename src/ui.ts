@@ -147,10 +147,10 @@ const DOC_SECTIONS = [
 function rejectionSVG(): string {
   const cellW = 48, cellH = 44, gap = 2;
   const colGap = 4;
-  const green = '#2d6a4f', red = '#d32f2f', blue = '#1565c0';
+  const green = '#2d6a4f', red = '#d32f2f';
   const borderColor = '#58a6ff';
 
-  function urnDiagram(title: string, columns: number[][], labels: string[], colColors: string[], w: number, h: number, ox: number, oy: number): string {
+  function urnDiagram(title: string, columns: number[][], labels: string[], colColors: string[], _w: number, _h: number, ox: number, oy: number): string {
     let svg = '';
     const maxRows = Math.max(...columns.map(c => c.length));
     const totalW = columns.length * cellW + (columns.length - 1) * colGap;
@@ -192,14 +192,12 @@ function rejectionSVG(): string {
 
   const diagramW = 6 * cellW + 5 * colGap;
   const diagramH = 2 * (cellH + gap) - gap + 22 + 26 + 8;
-  const totalW = diagramW * 2 + 50;
   const svgH = diagramH + 70;
 
   let content = '';
   content += urnDiagram('Modulo (biased)', biasedCols, biasedLabels, biasedColors, diagramW, diagramH, 10, 24);
   content += urnDiagram('Rejection sampling (fair)', fairCols, fairLabels, fairColors, diagramW, diagramH, diagramW + 50, 24);
 
-  const rejX = diagramW + 50 + diagramW + 16;
   const rejY = 24 + 22;
   content += `<rect x="${diagramW + 50 + diagramW + 8}" y="${rejY}" width="${cellW}" height="${cellH}" rx="3" fill="${red}" opacity="0.7"/>`;
   content += `<text x="${diagramW + 50 + diagramW + 8 + cellW / 2}" y="${rejY + cellH / 2 - 4}" text-anchor="middle" fill="#fff" font-size="10" font-weight="600">6</text>`;

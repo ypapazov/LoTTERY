@@ -48,6 +48,8 @@ See [AUDIT_GUIDE.md](AUDIT_GUIDE.md) for a step-by-step audit checklist.
 
 ## Recommended ceremony setup
 
+See [DEPLOYMENT.md](DEPLOYMENT.md) for the full guide. In short:
+
 1. Download `index.html` and its `SHA256SUMS` (+ GPG signature when available)
 2. Verify: `shasum -a 256 -c SHA256SUMS`
 3. Boot [TAILS](https://tails.net) from read-only media
@@ -81,6 +83,7 @@ dist/             Build output (single HTML + SHA256SUMS)
 | [SECURITY.md](SECURITY.md) | Security-aware readers | Threat model, protocol summary |
 | [PAPER.md](PAPER.md) | Cryptographers, auditors | Full construction with references |
 | [AUDIT_GUIDE.md](AUDIT_GUIDE.md) | Auditors, developers | Step-by-step verification checklist |
+| [DEPLOYMENT.md](DEPLOYMENT.md) | Ceremony operators | TAILS setup and ceremony preparation |
 
 ## License
 
