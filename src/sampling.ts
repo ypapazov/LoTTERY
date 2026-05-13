@@ -2,6 +2,11 @@ import { CSRNG } from './csrng';
 
 export interface DrawResult {
   value: number;
+  rawValue: bigint;
+  threshold: bigint;
+  outputSpace: bigint;
+  rangeSize: bigint;
+  chunkBytes: number;
   rejections: bigint[];
   duplicateRejections?: number[];
 }
@@ -62,6 +67,11 @@ export async function rejectionSample(
 
     return {
       value: Number(value % rangeSize + BigInt(min)),
+      rawValue: value,
+      threshold,
+      outputSpace,
+      rangeSize,
+      chunkBytes: k,
       rejections,
     };
   }

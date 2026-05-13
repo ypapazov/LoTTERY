@@ -139,7 +139,24 @@ export default defineConfig({
         if (tagIdx < 0) throw new Error('Could not find app module <script> tag in HTML');
         html = html.slice(0, tagIdx) + qrScriptTag + '\n  ' + html.slice(tagIdx);
 
-        // 2. Inject CSP (picks up both scripts + all styles)
+        // 2. Move top-level <style> before <script> tags to prevent FOUC.
+        // The top-level style is the one right before </head>, placed by vite-plugin-singlefile.
+        const headCloseIdx = html.lastIndexOf('</head>');
+        if (headCloseIdx >= 0) {
+          const styleCloseTag = '</style>';
+          const lastStyleCloseIdx = html.lastIndexOf(styleCloseTag, headCloseIdx);
+          if (lastStyleCloseIdx >= 0) {
+            const lastStyleOpenIdx = html.lastIndexOf('<style', lastStyleCloseIdx);
+            if (lastStyleOpenIdx >= 0) {
+              const styleBlock = html.slice(lastStyleOpenIdx, lastStyleCloseIdx + styleCloseTag.length);
+              html = html.slice(0, lastStyleOpenIdx) + html.slice(lastStyleCloseIdx + styleCloseTag.length);
+              const titleCloseIdx = html.indexOf('</title>') + '</title>'.length;
+              html = html.slice(0, titleCloseIdx) + '\n  ' + styleBlock + html.slice(titleCloseIdx);
+            }
+          }
+        }
+
+        // 3. Inject CSP (picks up both scripts + all styles)
         html = injectCSP(html);
         writeFileSync(htmlPath, html);
         console.log('\nQR library injected as separate <script> with SRI.');

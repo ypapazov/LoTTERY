@@ -101,12 +101,18 @@ button.danger { border-color: var(--red); color: var(--red); }
   z-index: 90;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
+  border: 2px solid transparent;
+  transition: border-color 0.4s ease;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 1rem;
   padding: 0.75rem 2rem;
   max-width: 1100px;
   margin: 0 auto;
+}
+.qr-strip.verified {
+  border-color: #2ea043;
+  border-bottom-color: #2ea043;
 }
 .qr-strip-item {
   text-align: center;

@@ -141,7 +141,7 @@ function updateChainQR(chainHash: string): void {
 let docWindow: Window | null = null;
 
 const DOC_SECTIONS = [
-  'overview', 'commitment', 'sources', 'xor', 'rejection', 'csrng', 'log', 'qr', 'verify',
+  'overview', 'ceremony_flow', 'modes', 'commitment', 'sources', 'xor', 'rejection', 'csrng', 'log', 'qr', 'verify', 'offline', 'glossary',
 ] as const;
 
 function rejectionSVG(): string {
@@ -244,6 +244,9 @@ strong{color:#e6edf3}
 em{color:#8b949e}
 sup,sub{font-size:0.75em}
 code{background:#161b22;padding:0.15rem 0.4rem;border-radius:3px;font-family:'SF Mono','Cascadia Code',monospace;font-size:0.9em}
+dl{margin:0.5rem 0}
+dt{color:#e6edf3;margin-top:0.8rem}
+dd{color:#c9d1d9;margin-left:1.2rem;margin-bottom:0.3rem}
 :target{background:#1f3a5f;border-radius:6px;padding:0.5rem;margin:-0.5rem}
 </style></head>
 <body>
@@ -492,6 +495,11 @@ async function handleVerify(): Promise<void> {
     const diagram = $('xor-diagram');
     diagram.classList.add('active', 'animate');
     setTimeout(() => diagram.classList.remove('animate'), 1200);
+
+    const allVerified = result.localVerified && result.remoteVerified && result.humanVerified;
+    if (allVerified) {
+      $('qr-strip').classList.add('verified');
+    }
   } finally {
     hideProcessing();
     syncButtons();
@@ -646,9 +654,7 @@ async function handleImportLogFile(event: Event): Promise<void> {
     ($('replay-max') as HTMLInputElement).value = String(max);
     ($('replay-draw-count') as HTMLInputElement).value = String(drawCount || 1);
 
-    show('replay-panel');
-    hide('live-panel');
-    setText('btn-replay-mode', t('toolbar.live'));
+    setMode(true);
   } catch (e) {
     alert(`${t('import.failed')} ${(e as Error).message}`);
   }
@@ -682,18 +688,31 @@ function handleReset(): void {
   location.reload();
 }
 
-function handleToggleReplay(): void {
-  const replay = $('replay-panel');
-  const showing = !replay.classList.contains('hidden');
-  if (showing) {
-    hide('replay-panel');
-    show('live-panel');
-    setText('btn-replay-mode', t('toolbar.replay'));
-  } else {
+function isVerifyMode(): boolean {
+  return !$('replay-panel').classList.contains('hidden');
+}
+
+function setMode(verify: boolean): void {
+  const btn = $('btn-mode-toggle');
+  if (verify) {
     show('replay-panel');
     hide('live-panel');
-    setText('btn-replay-mode', t('toolbar.live'));
+    btn.setAttribute('data-i18n', 'toolbar.ceremony');
+    setText('btn-mode-toggle', t('toolbar.ceremony'));
+    btn.classList.add('active');
+    $('btn-export-log').classList.add('hidden');
+  } else {
+    hide('replay-panel');
+    show('live-panel');
+    btn.setAttribute('data-i18n', 'toolbar.verify');
+    setText('btn-mode-toggle', t('toolbar.verify'));
+    btn.classList.remove('active');
+    $('btn-export-log').classList.remove('hidden');
   }
+}
+
+function handleToggleMode(): void {
+  setMode(!isVerifyMode());
 }
 
 async function handleReplay(): Promise<void> {
@@ -829,7 +848,7 @@ export function initUI(): void {
   $('btn-self-download').addEventListener('click', handleSelfDownload);
   $('btn-presentation').addEventListener('click', handleTogglePresentation);
   $('btn-reset').addEventListener('click', handleReset);
-  $('btn-replay-mode').addEventListener('click', handleToggleReplay);
+  $('btn-mode-toggle').addEventListener('click', handleToggleMode);
   $('btn-replay-run').addEventListener('click', handleReplay);
   $('btn-log-toggle').addEventListener('click', handleToggleLog);
 

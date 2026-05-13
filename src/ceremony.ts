@@ -277,12 +277,16 @@ export class Ceremony {
     for (;;) {
       result = await rejectionSample(rng, min, max);
 
-      for (const rejected of result.rejections) {
-        await this.emit('VALUE_REJECTED', {
-          rejected_value: rejected.toString(),
-          reason: 'Rejection sampling: value exceeds threshold, would introduce modulo bias',
-        });
-      }
+    for (const rejected of result.rejections) {
+      await this.emit('VALUE_REJECTED', {
+        rejected_value: rejected.toString(),
+        threshold: result.threshold.toString(),
+        output_space: result.outputSpace.toString(),
+        range_size: result.rangeSize.toString(),
+        chunk_bytes: result.chunkBytes,
+        reason: 'Rejection sampling: value exceeds threshold, would introduce modulo bias',
+      });
+    }
 
       if (drawnValues && drawnValues.has(result.value)) {
         duplicateRejections.push(result.value);
@@ -305,6 +309,11 @@ export class Ceremony {
     await this.emit('NUMBER_GENERATED', {
       draw_number: this.state.draws.length,
       value: result.value,
+      raw_value: result.rawValue.toString(),
+      threshold: result.threshold.toString(),
+      output_space: result.outputSpace.toString(),
+      range_size: result.rangeSize.toString(),
+      chunk_bytes: result.chunkBytes,
       rejections_count: result.rejections.length,
       duplicate_rejections_count: duplicateRejections.length,
     });

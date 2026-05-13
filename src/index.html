@@ -15,11 +15,9 @@
         <a id="btn-about" href="about.html" target="_blank" rel="noopener" data-i18n="toolbar.about">Какво е това?</a>
         <button id="btn-help" data-i18n="toolbar.help">Помощ</button>
         <button id="btn-lang" class="lang-btn" title="EN / BG">EN</button>
-        <button id="btn-replay-mode" data-i18n="toolbar.replay">Повторение</button>
+        <button id="btn-mode-toggle" data-i18n="toolbar.verify">Проверка</button>
         <button id="btn-presentation" data-i18n="toolbar.presentation">Презентация</button>
         <button id="btn-export-log" data-i18n="toolbar.export">Експорт на лог</button>
-        <button id="btn-import-log" data-i18n="toolbar.import">Импорт на лог</button>
-        <input type="file" id="import-log-file" accept=".json" class="hidden">
         <button id="btn-self-download" data-i18n="toolbar.download">Изтегляне на HTML</button>
         <button id="btn-reset" class="danger" data-i18n="toolbar.reset">Нулиране</button>
       </div>
@@ -58,8 +56,8 @@
             <div class="card-connector"></div>
             <div class="source-label">
               <svg viewBox="0 0 24 24" width="16" height="16"><use href="#icon-chip"/></svg>
-              <span data-i18n="card.local.label">Локален CSRNG</span>
-              <span class="info-icon" data-doc="commitment">&#9432;</span>
+              <span data-i18n="card.local.label" data-i18n-title="tip.csrng" title="CSRNG — криптографски сигурен генератор на случайни числа (вграден в браузъра)">Локален CSRNG</span>
+              <span class="info-icon" data-doc="commitment" data-i18n-title="tip.commitment" title="Commitment (заключване) — криптографско обещание за стойност, без да я разкрива">&#9432;</span>
             </div>
             <div class="source-lock" id="local-lock">
               <svg viewBox="0 0 24 24" width="28" height="28"><use href="#icon-lock-closed"/></svg>
@@ -76,7 +74,7 @@
             <div class="source-label">
               <svg viewBox="0 0 24 24" width="16" height="16"><use href="#icon-cloud"/></svg>
               <span data-i18n="card.remote.label">random.org</span>
-              <span class="info-icon" data-doc="commitment">&#9432;</span>
+              <span class="info-icon" data-doc="commitment" data-i18n-title="tip.commitment" title="Commitment (заключване) — криптографско обещание за стойност, без да я разкрива">&#9432;</span>
             </div>
             <div class="source-lock" id="remote-lock">
               <svg viewBox="0 0 24 24" width="28" height="28"><use href="#icon-lock-closed"/></svg>
@@ -99,7 +97,7 @@
             <div class="source-label">
               <svg viewBox="0 0 24 24" width="16" height="16"><use href="#icon-person"/></svg>
               <span data-i18n="card.human.label">Човешки вход</span>
-              <span class="info-icon" data-doc="commitment">&#9432;</span>
+              <span class="info-icon" data-doc="commitment" data-i18n-title="tip.commitment" title="Commitment (заключване) — криптографско обещание за стойност, без да я разкрива">&#9432;</span>
             </div>
             <div class="source-lock" id="human-lock">
               <svg viewBox="0 0 24 24" width="28" height="28"><use href="#icon-lock-closed"/></svg>
@@ -199,29 +197,31 @@
 
     <!-- Replay Panel -->
     <main id="replay-panel" class="hidden">
+      <input type="file" id="import-log-file" accept=".json" class="hidden">
       <section class="ceremony-phase replay-banner">
         <div class="replay-notice" data-i18n="replay.notice">Режим на повторение / Верификация</div>
+        <button id="btn-import-log" class="action-btn" data-i18n="toolbar.import">Импорт на лог</button>
 
         <div class="source-cards replay-cards">
           <div class="source-card replay-input-card">
-            <div class="source-label"><svg viewBox="0 0 24 24" width="16" height="16"><use href="#icon-chip"/></svg> <span data-i18n="replay.local_seed">Локален Seed</span></div>
+            <div class="source-label"><svg viewBox="0 0 24 24" width="16" height="16"><use href="#icon-chip"/></svg> <span data-i18n="replay.local_seed" data-i18n-title="tip.seed" title="Seed (начална стойност) — 32-байтово случайно число, входен материал за генератора">Локален Seed</span></div>
             <div class="replay-qr" id="replay-local-qr"></div>
             <input type="text" id="replay-local-seed" data-i18n-placeholder="replay.seed_placeholder" placeholder="Hex seed (64 символа)" class="mono">
-            <input type="text" id="replay-local-salt" data-i18n-placeholder="replay.salt_placeholder" placeholder="Salt (64 hex)" class="mono">
+            <input type="text" id="replay-local-salt" data-i18n-placeholder="replay.salt_placeholder" data-i18n-title="tip.salt" title="Salt — случайно число, добавено към PBKDF2" placeholder="Salt (64 hex)" class="mono">
             <input type="number" id="replay-local-iter" value="600000" class="small-input">
           </div>
           <div class="source-card replay-input-card">
-            <div class="source-label"><svg viewBox="0 0 24 24" width="16" height="16"><use href="#icon-cloud"/></svg> <span data-i18n="replay.remote_seed">Отдалечен Seed</span></div>
+            <div class="source-label"><svg viewBox="0 0 24 24" width="16" height="16"><use href="#icon-cloud"/></svg> <span data-i18n="replay.remote_seed" data-i18n-title="tip.seed" title="Seed (начална стойност) — 32-байтово случайно число, входен материал за генератора">Отдалечен Seed</span></div>
             <div class="replay-qr" id="replay-remote-qr"></div>
             <input type="text" id="replay-remote-seed" data-i18n-placeholder="replay.seed_placeholder" placeholder="Hex seed (64 символа)" class="mono">
-            <input type="text" id="replay-remote-salt" data-i18n-placeholder="replay.salt_placeholder" placeholder="Salt (64 hex)" class="mono">
+            <input type="text" id="replay-remote-salt" data-i18n-placeholder="replay.salt_placeholder" data-i18n-title="tip.salt" title="Salt — случайно число, добавено към PBKDF2" placeholder="Salt (64 hex)" class="mono">
             <input type="number" id="replay-remote-iter" value="600000" class="small-input">
           </div>
           <div class="source-card replay-input-card">
             <div class="source-label"><svg viewBox="0 0 24 24" width="16" height="16"><use href="#icon-person"/></svg> <span data-i18n="replay.human_input">Човешки вход</span></div>
             <div class="replay-qr" id="replay-human-qr"></div>
             <input type="text" id="replay-human-input" data-i18n-placeholder="replay.human_placeholder" placeholder="Оригинална казана стойност">
-            <input type="text" id="replay-human-salt" data-i18n-placeholder="replay.salt_placeholder" placeholder="Salt (64 hex)" class="mono">
+            <input type="text" id="replay-human-salt" data-i18n-placeholder="replay.salt_placeholder" data-i18n-title="tip.salt" title="Salt — случайно число, добавено към PBKDF2" placeholder="Salt (64 hex)" class="mono">
             <input type="number" id="replay-human-iter" value="600000" class="small-input">
           </div>
         </div>
